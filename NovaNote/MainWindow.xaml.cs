@@ -40,6 +40,7 @@ namespace NovaNote
         DispatcherTimer _status;
         Point? _dragStart;
         TabModel _dragTab;
+        bool _closingForUpdate;
 
         public TabModel Active => _active;
         public DocumentView ActiveView => _active?.View;
@@ -401,6 +402,7 @@ namespace NovaNote
             SyntaxCheckItem.IsChecked = SessionStore.Prefs.SyntaxCheck;
             FoldingItem.IsChecked = SessionStore.Prefs.Folding;
             SyntaxNextItem.IsEnabled = ActiveView?.HasSyntaxErrors == true;
+            UpdateAutoItem.IsChecked = SessionStore.Prefs.UpdateCheck;
             UpdateEncodingChecks();
             UpdateEolChecks();
             UpdateLanguageChecks();
@@ -488,6 +490,22 @@ namespace NovaNote
             _sessionDirty = false;
         }
 
+        public bool SaveSessionForUpdate()
+        {
+            foreach (var tab in Tabs.ToList())
+            {
+                if (!tab.View.PromptDirty())
+                    return false;
+            }
+            SaveSessionNow();
+            return true;
+        }
+
+        public void AllowUpdateClose()
+        {
+            _closingForUpdate = true;
+        }
+
         // ---------- Datei ----------
 
         void NewTab_Click(object sender, RoutedEventArgs e) => NewTab();
@@ -501,6 +519,12 @@ namespace NovaNote
 
         void MainWindow_Closing(object sender, CancelEventArgs e)
         {
+            if (_closingForUpdate)
+            {
+                _closingForUpdate = false;
+                return;
+            }
+
             var tabs = Tabs.ToList();
             if (SessionStore.Prefs.MultiTab && tabs.Count >= 2)
             {
@@ -986,6 +1010,17 @@ namespace NovaNote
             if (v == null) return;
             v.Print(MargL, MargT, MargR, MargB, this, out string printer);
             if (printer != null) LastPrinterName = printer;
+        }
+
+        void UpdateAuto_Click(object sender, RoutedEventArgs e)
+        {
+            SessionStore.Prefs.UpdateCheck = UpdateAutoItem.IsChecked;
+            SessionStore.SavePrefs();
+        }
+
+        async void UpdateNow_Click(object sender, RoutedEventArgs e)
+        {
+            await UpdateService.CheckAsync(this, true);
         }
 
         void HelpAbout_Click(object sender, RoutedEventArgs e)

@@ -88,6 +88,7 @@ namespace NovaNote
                 window.Height = rect[3];
             }
             window.Show();
+            UpdateService.StartStartupCheck(window);
 
             // Weitere windows aus der Session öffnen.
             for (int i = 1; i <= extra; i++)

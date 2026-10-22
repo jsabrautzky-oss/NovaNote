@@ -69,7 +69,8 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`.
 | `Theme/Light.xaml`, `Theme/Dark.xaml` | Theme-Farb-Brushes | u. a. `EditorBgBrush`, `TextBrush`, `SubtleTextBrush`, `SelectionBrush`, `Syntax*Brush`, `SyntaxErrorBrush` |
 | `Theme/Controls.xaml` | Control-Styles für WPF-Controls | global gemerged |
 | `Theme/ThemeService.cs` | hell/dunkel/system, DWM-Titelleiste, `ThemeChanged` | ersetzt gemergte Theme-Dictionary in `Application.Current.Resources.MergedDictionaries` |
-| `SessionStore.cs` | `AppPrefs`, `SessionState`, JSON in `%APPDATA%\NovaNote\einstellungen.json` und `sitzung.json` | Prefs: RestoreSession, MultiTab, LanguageAuto, ShowLineNumbers, ShowWhitespace, SyntaxCheck, Folding, Theme |
+| `UpdateService.cs` | GitHub Update-Check und Setup-Download | `Program.Main` läuft zuerst; App ruft `UpdateService.StartStartupCheck(window)`; Manual über `AboutDialog`/`MainWindow`; Setup wird silent mit `App.StartupArgs` gestartet |
+| `SessionStore.cs` | `AppPrefs`, `SessionState`, JSON in `%APPDATA%\NovaNote\einstellungen.json` und `sitzung.json` | Prefs: RestoreSession, MultiTab, LanguageAuto, ShowLineNumbers, ShowWhitespace, SyntaxCheck, Folding, Theme, UpdateCheck, DismissedUpdateVersion |
 | `Dialogs/*.xaml(.cs)` | Suche/Ersetzen, Goto, Schriftwahl, About, PageSetup | `SearchDialog`/`GoToDialog` haben `MainWindow`-Referenz und rufen Such/Goto-API |
 | `app.manifest`, `novanote.ico` | DPI/Manifest, Icon | Icon für EXE, Installer und Explorer-DefaultIcon |
 | `installer.ps1` | Publish + `vpk pack` zu Velopack-Installer | erzeugt `publish/` und `Releases/` |
@@ -86,6 +87,13 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`.
    - Folding: 350 ms; JSON/CSS/JS/C++ Hintergrund-Scan; XML/HTML synchron `XmlFoldingStrategy`.
 6. `MainWindow.UpdateStatusNow()` liest `v.GetStatus()`, `v.SyntaxStatus`, `v.Enc/Eol/Zoom/StatusLanguage` und aktualisiert `StatusSyntax` mit `SyntaxErrorBrush`.
 7. Session wird beim Schließen geserialized (`SessionStore.SaveSession`), Preferences bei Menü-Toggles (`SavePrefs`).
+
+## Update-Fluss
+- `UpdateService.CheckAsync` prüft GitHub Releases und sucht das Asset `NovaNote-win-Setup.exe`.
+- Automatischer Check beim Start: nur wenn installiert, nicht portable/dev, und `SessionStore.Prefs.UpdateCheck` aktiv ist.
+- Manual check: Button in AboutDialog und Menü „Nach Update prüfen“; funktioniert auch dev/portable als Download-Test.
+- Bei Update: Prompt, dirty Tabs speichern, Session speichern, Setup nach `%TEMP%` herunterladen, `Setup.exe --silent -- [StartupArgs]` starten, MainWindow-Closing mit `_closingForUpdate` unterdrücken, `Application.Shutdown(0)`.
+- GitHub-Fehler werden silent geloggt (`%APPDATA%\NovaNote\update.log`); manual check zeigt Fehler als MessageBox.
 
 ## Velopack- und Dateiassozierung-Fluss
 - `Program.Main` führt `VelopackApp` vor der WPF-App aus, damit Update-/Installer-Specialargs korrekt behandelt werden.

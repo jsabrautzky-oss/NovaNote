@@ -15,8 +15,16 @@
 
         <TextBlock Grid.Row="0" Text="NovaNote" FontSize="20" FontWeight="SemiBold"
                    Foreground="{DynamicResource TextBrush}"/>
-        <TextBlock Grid.Row="1" x:Name="VersionText" Margin="0,6,0,0"
-                   Foreground="{DynamicResource SubtleTextBrush}"/>
+        <Grid Grid.Row="1" Margin="0,6,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="VersionText" Grid.Column="0" VerticalAlignment="Center"
+                       Foreground="{DynamicResource SubtleTextBrush}"/>
+            <Button Grid.Column="1" Style="{StaticResource BtnAccent}" Content="Update prüfen" MinWidth="84"
+                    Margin="12,0,0,0" Click="Update_Click"/>
+        </Grid>
         <TextBlock Grid.Row="2" Margin="0,12,0,0" TextWrapping="Wrap"
                    Foreground="{DynamicResource TextBrush}"
                    Text="WPF-Texteditor für Windows mit AvalonEdit, Themes (hell/dunkel/system), Mehrfach-Tabs, Syntax-Highlighting und Syntax-Check für JSON, XML, HTML, CSS, JavaScript und C++, Code-Folding, Encoding/EOL, Suchen/Ersetzen, Zoom, Drucken und Session-Wiederherstellung."/>

@@ -127,6 +127,13 @@
             </MenuItem>
 
             <MenuItem Header="Hilfe">
+                <MenuItem Header="Update">
+                    <MenuItem x:Name="UpdateAutoItem" Header="Automatisch auf Updates prüfen"
+                             IsCheckable="True" IsChecked="True" Click="UpdateAuto_Click"/>
+                    <Separator/>
+                    <MenuItem x:Name="UpdateNowItem" Header="Nach Update prüfen" Click="UpdateNow_Click"/>
+                </MenuItem>
+                <Separator/>
                 <MenuItem x:Name="HelpAboutItem" Header="Über NovaNote" Click="HelpAbout_Click"/>
             </MenuItem>
         </Menu>

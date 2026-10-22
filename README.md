@@ -63,6 +63,12 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.1.0-beta/NovaNo
 Direkter Portable-Download:  
 https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.1.0-beta/NovaNote-win-Portable.zip
 
+## Updates
+- NovaNote kann beim Start automatisch prüfen, ob auf GitHub ein neuer Release mit `NovaNote-win-Setup.exe` vorhanden ist.
+- Wenn ein Update gefunden wird, fragt NovaNote, ob das Setup heruntergeladen und ausgeführt wird.
+- Die automatische Update-Prüfung kann im Menü „Hilfe → Update → Automatisch auf Updates prüfen“ deaktiviert werden.
+- „Über NovaNote“ enthält einen Button „Update prüfen“, der einen sofortigen Update-Check ausführt.
+
 ## Voraussetzungen
 - 64-bit Windows 10 oder Windows 11
 - Internetzugang für Download und spätere Updates

@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Navigation;
 using Velopack.Locators;
 
@@ -25,6 +26,16 @@ namespace NovaNote
                 : "nicht installiert";
 
             VersionText.Text = $"Version {version} · .NET {Environment.Version.ToString(2)} WPF · Velopack: {install}";
+        }
+
+        private async void Update_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            if (button != null) button.IsEnabled = false;
+
+            await UpdateService.CheckAsync(this, true);
+
+            if (button != null && IsLoaded) button.IsEnabled = true;
         }
 
         private void GitHub_RequestNavigate(object sender, RequestNavigateEventArgs e)

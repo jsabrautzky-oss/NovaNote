@@ -15,6 +15,8 @@ namespace NovaNote
         public bool SyntaxCheck { get; set; } = true;
         public bool Folding { get; set; } = true;
         public string Theme { get; set; } = ThemeService.System;
+        public bool UpdateCheck { get; set; } = true;
+        public string DismissedUpdateVersion { get; set; } = null;
     }
 
     public class SessionTab
