@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Style="{StaticResource DialogWindow}"
-        Title="Über NovaNote" Width="480">
-    <Grid Margin="20" MinWidth="420">
+        Title="Über NovaNote" Width="480" SizeToContent="Height">
+    <Grid Margin="20" MinWidth="340">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
