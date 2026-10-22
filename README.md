@@ -7,9 +7,6 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.1.0-beta
 
 ## Was kann NovaNote?
 - Dateien bearbeiten: `.txt`, `.json`, `.xml`, `.html`, `.css`, `.js`, `.cpp`
-- Syntax-Highlighting für JSON, XML, HTML, CSS, JavaScript und C++
-- Syntax-Check mit roter Fehlermarkierung und `F4` zum nächsten Fehler
-- Code-Folding für Klammern und HTML/XML-Bereiche
 - Mehrfach-Tabs und Tabs in eigene Fenster lösen
 - Session-Wiederherstellung: Fenster und Tabs beim nächsten Start wieder öffnen
 - Suchen/Ersetzen, Gehe zu Zeile, Zoom, Word-Wrap, Line Numbers
@@ -18,6 +15,20 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.1.0-beta
 - Drucken mit Seiteneinrichtung
 - Themes: Hell, Dunkel, System
 - Drag & Drop von Dateien
+
+## Unterstützte Sprachen
+| Sprache | Syntax-Highlighting | Syntax-Check | Code-Folding | Hinweis |
+|---|---:|---:|---:|---|
+| Plain Text | ❌ | ❌ | ❌ | kein Sprachmodus |
+| JSON | ✓ | ✓ | ✓ | mit roter Fehlermarkierung und `F4` |
+| XML | ✓ | ✓ | ✓ | mit roter Fehlermarkierung und `F4` |
+| HTML | ✓ | ✓ | ✓ | mit roter Fehlermarkierung und `F4` |
+| CSS | ✓ | ✓ | ✓ | mit roter Fehlermarkierung und `F4` |
+| JavaScript | ✓ | ✓ | ✓ | Grundprüfung mit Acornima, nicht vollständig |
+| C++ | ✓ | ✓ | ✓ | Grundprüfung für Klammern/Kommentare, kein Compiler-Check |
+| TypeScript | ✓ als JavaScript | ❌ | ✓ als JavaScript | TypeScript wird erkannt, aber nicht geprüft |
+
+Hinweis: Weitere Sprachen sollen später folgen.
 
 ## Vorteile
 - Modernes, minimalistisches Windows-UI
