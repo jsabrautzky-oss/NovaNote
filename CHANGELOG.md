@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.1
+Bugfix-Release: Der Update-Setup konnte nicht gestartet werden („Datei wird von einem anderen Prozess verwendet“), weil der Download die Datei beim Start noch offen hielt.
+
+### Behoben / Fixes
+- `UpdateService.DownloadSetupAsync` schließt alle Download-Streams, bevor `LaunchSetup` das Setup startet; der Update-Dialog „Update prüfen → Herunterladen“ funktioniert wieder
+- README enthält unten die Credits „Erstellt mit lokaler KI“
+
+### Installation / Releases
+- Velopack-Installer: `NovaNote-win-Setup.exe`
+- Portable-Zip: `NovaNote-win-Portable.zip`
+- Delta-Paket von 0.5.0 (klein, nur geänderte Dateien)
+
 ## 0.5.0
 NovaNote 0.5.0 ist die erste Release-Version mit der optionalen lokalen KI-Anbindung: Editor ohne Cloud-Zwang, KI nur gegen den eigenen Server.
 

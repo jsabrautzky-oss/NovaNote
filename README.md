@@ -2,8 +2,11 @@
 
 **Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-Aktuelle Version: **0.5.0**  
-GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.5.0
+Aktuelle Version: **0.5.1**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.5.1
+
+## Neu in 0.5.1
+- Bugfix: „Update prüfen → Setup herunterladen“ startet das Setup jetzt korrekt (der Download hielt die Datei beim Start offen)
 
 ## Neu in 0.5.0
 - **KI-Assistent im rechten Chat-Panel** (optional, standardmäßig geschlossen): Antworten, Suche, Zusammenfassung und Editor-Aktionen
@@ -90,7 +93,7 @@ Hinweis: Weitere Sprachen sollen später folgen.
 4. Optional: `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` per Doppelklick mit NovaNote öffnen.
 
 Direkter Installer-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.0/NovaNote-win-Setup.exe
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.1/NovaNote-win-Setup.exe
 
 ## Installation als Portable-Version
 1. `NovaNote-win-Portable.zip` von der GitHub-Release-Seite herunterladen.
@@ -98,7 +101,7 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.0/NovaNote-wi
 3. `NovaNote.exe` starten.
 
 Direkter Portable-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.0/NovaNote-win-Portable.zip
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.1/NovaNote-win-Portable.zip
 
 ## Updates
 - NovaNote kann beim Start automatisch prüfen, ob auf GitHub ein neuer Release mit `NovaNote-win-Setup.exe` vorhanden ist.

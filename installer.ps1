@@ -1,5 +1,5 @@
 param(
-  [string]$packVersion = "0.5.0"
+  [string]$packVersion = "0.5.1"
 )
 
 $ErrorActionPreference = "Stop"

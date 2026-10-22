@@ -1,8 +1,8 @@
 param(
-  [string]$version = "0.5.0",
+  [string]$version = "0.5.1",
   [string]$repo = "jsabrautzky-oss/NovaNote",
-  [string]$tag = "v0.5.0",
-  [string]$title = "NovaNote 0.5.0",
+  [string]$tag = "v0.5.1",
+  [string]$title = "NovaNote 0.5.1",
   [bool]$prerelease = $false
 )
 
@@ -17,25 +17,18 @@ $gh = Get-Command gh -ErrorAction SilentlyContinue
 $ghPath = if ($gh) { $gh.Source } else { "C:\Program Files\GitHub CLI\gh.exe" }
 
 $notes = @(
-  'NovaNote 0.5.0 - leichter Windows-Texteditor (AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check) - optional mit lokaler KI-Anbindung, kein Cloud-Zwang.',
-  '',
-  'Neu:',
-  '- Optionales KI-Panel rechts im Fenster (Strg+Alt+K): Chat mit Dokumentkontext, Multi-Turn, Abbrechen',
-  '- Editor-Werkzeuge per Tool-Call: get_document, search_document, goto_line, select_lines, replace_all_text, replace_lines, insert_at_line, syntax_check, format_code',
-  '- Editor-Aktionen erst nach "Uebernehmen" oder automatisch; Aenderungen bleiben eine Undo-Group',
-  '- Anbieter-Verwaltung (LM Studio, Ollama, OpenAI-kompatibel, eigene Adresse) mit Modell-Auto-Scan: Kontext, Vision, Tools',
-  '- API-Key verschluesselt (DPAPI); Codeuebernahme aus Antwort-Codeblocken; ```nova```-Fallback fuer Modelle ohne Tools',
-  '- Panel-Breite wird nach dem Zerren am Trenner gespeichert',
-  '- Markdown, Python, C# und YAML wie in 0.2.0; dynamisches Rechtsklick-Menue; Tab-Views werden disposed',
+  'NovaNote 0.5.1 - Bugfix-Release fuer den Update-Setup-Start. Leichter Windows-Texteditor (AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check) - optional mit lokaler KI-Anbindung, kein Cloud-Zwang.',
   '',
   'Fixes:',
-  '- ComboBoxen zeigen die Auswahl im geschlossenen Feld',
-  '- KI-Einstellungsdialog: keine ueberlappenden Zeilen mehr',
+  '- "Update pruefen -> Setup herunterladen" startet das Setup jetzt: der Download hielt die Datei beim Start offen ("von einem anderen Prozess verwendet")',
+  '- KI schickt den Dokumenttext nicht mehr automatisch; sie liest bei Bedarf selbst per get_document/search_document (spart Tokens)',
+  '- ComboBoxen zeigen die Auswahl im geschlossenen Feld; KI-Einstellungsdialog ohne ueberlappende Zeilen',
   '',
   'Enthalten:',
-  '- Velopack-Installer (NovaNote-win-Setup.exe)',
-  '- Portable-Zip (NovaNote-win-Portable.zip)',
-  '- Dateiendungen .txt/.md/.markdown/.json/.xml/.html ueber HKCU-ProgID NovaNote.Editor',
+  '- Optionales KI-Panel (Strg+Alt+K) mit Tool-Calls: get_document, search_document, goto_line, select_lines, replace_all_text, replace_lines, insert_at_line, syntax_check, format_code',
+  '- Anbieter-Verwaltung (LM Studio, Ollama, OpenAI-kompatibel, eigene Adresse) mit Modell-Auto-Scan; API-Key verschluesselt (DPAPI)',
+  '- Velopack-Installer (NovaNote-win-Setup.exe), Portable-Zip, Delta ab 0.5.0',
+  '- Markdown, Python, C# und YAML; Dateiendungen .txt/.md/.markdown/.json/.xml/.html ueber HKCU-ProgID NovaNote.Editor',
   '',
   'Hinweis: Die KI ist optional und laeuft nur gegen einen lokalen OpenAI-kompatiblen Server (LM Studio, Ollama, llama-server).'
 ) -join "`n"

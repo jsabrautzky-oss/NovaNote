@@ -1,7 +1,7 @@
 # NovaNote — interne Architektur-Landkarte
 
 Repo: https://github.com/jsabrautzky-oss/NovaNote  
-Aktuelle Version: 0.5.0  
+Aktuelle Version: 0.5.1  
 
 Diese Datei ist nur für interne Coding-/KI-Agenten gedacht und nicht für öffentliche Nutzerdoku. Sie soll Scannen des ganzen Codes vermeiden. Alles Wichtige ist hier zusammengefasst: Komponenten, Abhängigkeiten, öffentliche APIs, Fluss, Fallstricke.
 
@@ -26,13 +26,13 @@ Das Script erzeugt:
 
 GitHub-Release erzeugen und hochladen (nach `gh auth login` oder mit `GH_TOKEN`):
 ```powershell
-powershell .\release.ps1 -version 0.5.0 -repo jsabrautzky-oss/NovaNote -tag v0.5.0 -title "NovaNote 0.5.0" -prerelease $false
+powershell .\release.ps1 -version 0.5.1 -repo jsabrautzky-oss/NovaNote -tag v0.5.1 -title "NovaNote 0.5.1" -prerelease $false
 ```
 
 Wichtige Velopack-Parameter:
 - `packId`: `NovaNote`
 - `mainExe`: `NovaNote.exe`
-- `packVersion`: `0.5.0`
+- `packVersion`: `0.5.1`
 - `icon`: `NovaNote\novanote.ico`
 - `runtime`: `win-x64`
 
