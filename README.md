@@ -120,3 +120,8 @@ NovaNote läuft für:
 - Windows 11 x64
 
 Es gibt aktuell keine Linux-, macOS- oder ARM-/32-bit-Versionen.
+
+## Erstellt mit lokaler KI
+- Opencode Desktop
+- Strata 0.2.2 · Engine 0.1.47
+- Model: Qwen3.8-Flash-Next Gyro-S
