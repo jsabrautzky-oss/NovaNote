@@ -11,7 +11,7 @@
     <Color x:Key="PopupHoverColor">#E8E8E8</Color>
     <Color x:Key="AccentColor">#005FB8</Color>
     <Color x:Key="AccentFgColor">#FFFFFF</Color>
-    <Color x:Key="SelectionColor">#005FB859</Color>
+    <Color x:Key="SelectionColor">#59005FB8</Color>
     <Color x:Key="DividerColor">#DEDEDE</Color>
     <Color x:Key="ButtonBgColor">#FBFBFB</Color>
     <Color x:Key="ButtonBorderColor">#E2E2E2</Color>

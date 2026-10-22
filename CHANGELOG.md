@@ -13,6 +13,7 @@ Beta mit Markdown, Python, C# und YAML.
 - YAML-Syntax-Check mit YamlDotNet und Folding nach Einrückung über `IndentFoldingStrategy`
 - Sprachen-Menü mit Markdown, Python, C# und YAML sowie „Code formatieren“ und „Python-Completion“
 - Öffnen-Dialog mit Filtern für `.md`, `.py`, `.cs` und `.yaml`
+- Rechtsklick-Menü im Editor mit dynamischen Aktionen: Cut/Copy/Delete nur mit Auswahl, Paste nur mit Zwischenablage, Undo/Redo nur wenn verfügbar, „JSON formatieren“ nur im JSON-Modus, „Code formatieren“ für Python/C#, „Python-Completion“ nur bei bereitem LSP, „Markdown-Vorschau aktualisieren“ nur bei offener Vorschau, sowie Zoom, Zeilenumbruch, Syntax-Check, Folding und nächster Syntaxfehler
 - Editor-Tabs werden beim Schließen, Detach und Beenden sauber disposed
 
 ### Installation / Releases
@@ -29,6 +30,11 @@ Beta mit Markdown, Python, C# und YAML.
 - Python-Formatierung hängt von lokal installierten Tools ab (`ruff format`, `black`, `autopep8`). Ohne diese Tools bleibt der Text unverändert oder zeigt eine Meldung.
 - C#-Syntax-Check prüft primär Syntax; semantische Compilerfehler aus vollständigen Projekten werden nicht erkannt.
 - YAML-Folding basiert auf Einrückung und kann bei stark gemischten YAML-Strukturen ungenau sein.
+
+### Behoben / Fixes
+- Hell-Schema: `SelectionColor` war `#005FB859` (Alpha `00` = komplett transparent), markierter Text war nicht sichtbar. Jetzt `#59005FB8`.
+- Dunkel-Schema: `SelectionColor` `#4CC2FF59` korrigiert auf `#594CC2FF` (richtiger Akzent-Ton statt Grün-Stich).
+- Rechtsklick-Menü hatte keinen Theme-Stil: im dunklen Modus heller Popup-Hintergrund mit hellem Text (unkontrastierend). `Theme/Controls.xaml` hat jetzt einen `ContextMenu`-Style mit `PopupBgBrush`, `PopupBorderBrush` und `TextBrush` (dunkel im Dark, hell in Light).
 
 ## 0.1.0-beta
 Erste öffentliche Beta-Version von NovaNote.

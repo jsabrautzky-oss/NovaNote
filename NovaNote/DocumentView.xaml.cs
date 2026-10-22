@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -24,6 +25,37 @@ using Microsoft.CodeAnalysis.Formatting;
 
 namespace NovaNote
 {
+    public enum DocAction
+    {
+        Undo,
+        Redo,
+        Cut,
+        Copy,
+        Paste,
+        Delete,
+        SelectAll,
+        FormatJson,
+        FormatCode,
+        PythonCompletion,
+        MarkdownRefresh,
+        NextSyntaxError,
+        SyntaxCheck,
+        Folding,
+        Find,
+        FindNext,
+        Replace,
+        GoToLine,
+        InsertDateTime,
+        Save,
+        SaveAs,
+        Print,
+        WordWrap,
+        ZoomIn,
+        ZoomOut,
+        ZoomReset,
+        Detach
+    }
+
     public partial class DocumentView : UserControl, IDisposable
     {
         public string Path_ { get; private set; } = null;
@@ -74,9 +106,13 @@ namespace NovaNote
         bool _pythonPullFailed;
         CompletionWindow _completionWindow;
         bool _disposed;
+        int _menuSelStart, _menuSelLen;
+        Window _menuWindow;
+        MouseButtonEventHandler _menuOutsideHandler;
 
         public event EventHandler StateChanged;
         public event EventHandler DirtyChanged;
+        public event Action<DocumentView, DocAction, bool> ContextAction;
 
         public DocumentView()
         {
@@ -106,6 +142,7 @@ namespace NovaNote
             Editor.TextArea.TextEntered += Editor_TextEntered;
             Editor.TextArea.SelectionChanged += (s, e) => StateChanged?.Invoke(this, EventArgs.Empty);
             Editor.TextArea.Caret.PositionChanged += (s, e) => StateChanged?.Invoke(this, EventArgs.Empty);
+            StateChanged += (s, e) => UpdateContextMenuState();
         }
 
         static Brush AppBrush(string key)
@@ -355,6 +392,141 @@ namespace NovaNote
         }
 
         public void FocusEditor() => Editor.Focus();
+
+        bool IsMarkdown => Lang == DocLanguage.Markdown || DocLanguages.FromExtension(Path_) == DocLanguage.Markdown;
+
+        // ---------- Rechtsklick-Menü ----------
+
+        void Editor_PreviewRightDown(object sender, MouseButtonEventArgs e)
+        {
+            _menuSelStart = Editor.SelectionStart;
+            _menuSelLen = Editor.SelectionLength;
+            UpdateContextMenuState();
+            EditorMenuPopup.PlacementTarget = Editor.TextArea;
+            EditorMenuPopup.Placement = PlacementMode.MousePoint;
+            EditorMenuPopup.IsOpen = true;
+            EditorMenuPopup.Focus();
+            e.Handled = true;
+        }
+
+        void Menu_Opened(object sender, EventArgs e)
+        {
+            _menuOutsideHandler ??= Menu_OutsideMouseDown;
+            _menuWindow = Window.GetWindow(this);
+            _menuWindow?.AddHandler(Mouse.PreviewMouseDownEvent, _menuOutsideHandler, true);
+        }
+
+        void Menu_Closed(object sender, EventArgs e)
+        {
+            _menuWindow?.RemoveHandler(Mouse.PreviewMouseDownEvent, _menuOutsideHandler);
+            _menuWindow = null;
+        }
+
+        void Menu_OutsideMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!EditorMenuPopup.IsOpen) return;
+            if (IsInsidePopup(e.OriginalSource as DependencyObject)) return;
+            EditorMenuPopup.IsOpen = false;
+        }
+
+        bool IsInsidePopup(DependencyObject source)
+        {
+            var child = EditorMenuPopup.Child;
+            if (child == null || source == null) return false;
+            for (DependencyObject cur = source; cur != null;
+                 cur = cur is Visual ? VisualTreeHelper.GetParent(cur) : LogicalTreeHelper.GetParent(cur))
+                if (ReferenceEquals(cur, child)) return true;
+            return false;
+        }
+
+        void RestoreMenuSelection()
+        {
+            if (_menuSelLen > 0 && Editor.SelectionLength == 0)
+            {
+                Editor.SelectionStart = _menuSelStart;
+                Editor.SelectionLength = _menuSelLen;
+            }
+        }
+
+        void Ctx_Click(object sender, RoutedEventArgs e)
+        {
+            string tag = (sender as MenuItem)?.Tag as string;
+            DocAction action;
+            if (string.IsNullOrEmpty(tag) || !Enum.TryParse(tag, out action)) return;
+
+            if (action == DocAction.MarkdownRefresh)
+            {
+                UpdateMarkdownPreview();
+                EditorMenuPopup.IsOpen = false;
+                Editor.Focus();
+                return;
+            }
+
+            if (action == DocAction.Cut || action == DocAction.Copy || action == DocAction.Delete)
+                RestoreMenuSelection();
+
+            bool value = action == DocAction.SyntaxCheck ? !_syntaxEnabled
+                       : action == DocAction.Folding ? !_foldingEnabled
+                       : action == DocAction.WordWrap ? !WordWrap
+                       : false;
+            ContextAction?.Invoke(this, action, value);
+            EditorMenuPopup.IsOpen = false;
+            Editor.Focus();
+        }
+
+        void UpdateContextMenuState()
+        {
+            if (CtxCopyItem == null) return;
+            bool selection = Editor.SelectionLength > 0 || _menuSelLen > 0;
+            bool clipboardText = false;
+            try { clipboardText = Clipboard.ContainsText(); } catch { }
+
+            bool undo = Show(CtxUndoItem, CanUndo);
+            bool redo = Show(CtxRedoItem, CanRedo);
+            bool cut = Show(CtxCutItem, selection);
+            bool copy = Show(CtxCopyItem, selection);
+            bool delete = Show(CtxDeleteItem, selection);
+            bool paste = Show(CtxPasteItem, clipboardText);
+            bool selectAll = Show(CtxSelectAllItem, Doc.TextLength > 0);
+
+            bool json = Show(CtxFormatJsonItem, Lang == DocLanguage.Json);
+            bool code = Show(CtxFormatCodeItem, FormatSupported);
+            bool python = Show(CtxPythonCompletionItem, Lang == DocLanguage.Python && PythonLspReady);
+            bool previewOpen = IsMarkdown && PreviewBorder != null && PreviewBorder.Visibility == Visibility.Visible;
+            bool markdown = Show(CtxMarkdownPreviewItem, previewOpen);
+
+            Show(CtxNextErrorItem, HasSyntaxErrors);
+            CtxSyntaxCheckItem.Visibility = Visibility.Visible;
+            CtxSyntaxCheckItem.IsChecked = _syntaxEnabled;
+            CtxFoldingItem.Visibility = Visibility.Visible;
+            CtxFoldingItem.IsChecked = _foldingEnabled;
+
+            Show(CtxSaveItem, IsDirty);
+            CtxWrapItem.Visibility = Visibility.Visible;
+            CtxWrapItem.IsChecked = WordWrap;
+            Show(CtxZoomResetItem, Zoom != 100);
+            Show(CtxDetachItem, SessionStore.Prefs.MultiTab);
+
+            bool gEdit = undo || redo;
+            bool gClipboard = cut || copy || delete || paste || selectAll;
+            bool gFormat = json || code || python || markdown;
+
+            CtxSepEdit.Visibility = Sep(gEdit, gClipboard);
+            CtxSepClipboard.Visibility = Sep(gClipboard, gFormat);
+            CtxSepFormat.Visibility = Sep(gFormat, true);
+            CtxSepSyntax.Visibility = Visibility.Visible;
+            CtxSepSearch.Visibility = Visibility.Visible;
+            CtxSepSave.Visibility = Visibility.Visible;
+        }
+
+        static bool Show(UIElement item, bool on)
+        {
+            item.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            return on;
+        }
+
+        static Visibility Sep(bool before, bool after)
+            => before && after ? Visibility.Visible : Visibility.Collapsed;
 
         // ---------- Sprache/Highlight ----------
 
@@ -794,6 +966,7 @@ namespace NovaNote
             _syntaxEnabled = on;
             if (on) ScheduleSyntaxCheck();
             else SetSyntaxResult(null, "Syntax-Check aus");
+            UpdateContextMenuState();
         }
 
         void ScheduleSyntaxCheck()
@@ -943,6 +1116,7 @@ namespace NovaNote
             _foldingEnabled = on;
             if (on) ScheduleFolding();
             else ClearFoldings();
+            UpdateContextMenuState();
         }
 
         void ScheduleFolding()
@@ -1419,6 +1593,7 @@ namespace NovaNote
             _disposed = true;
             _completionWindow?.Close();
             _completionWindow = null;
+            EditorMenuPopup.IsOpen = false;
             DisposePythonLsp();
             _syntaxTimer.Stop();
             _foldingTimer.Stop();

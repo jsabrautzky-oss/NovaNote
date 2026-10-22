@@ -18,7 +18,59 @@
                            ShowLineNumbers="True" LineNumbersForeground="{DynamicResource SubtleTextBrush}"
                            VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                            Padding="4,4,4,4" WordWrap="True"
-                           PreviewMouseWheel="Editor_PreviewMouseWheel"/>
+                           PreviewMouseWheel="Editor_PreviewMouseWheel"
+                           PreviewMouseRightButtonDown="Editor_PreviewRightDown"/>
+            <Popup x:Name="EditorMenuPopup" Focusable="True" AllowsTransparency="True"
+                   StaysOpen="True" PopupAnimation="Fade" Placement="MousePoint"
+                   Opened="Menu_Opened" Closed="Menu_Closed">
+                <Border Background="{DynamicResource PopupBgBrush}" BorderBrush="{DynamicResource PopupBorderBrush}"
+                        BorderThickness="1" CornerRadius="8" Padding="4" MinWidth="230" SnapsToDevicePixels="True">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.30" Color="#000000"/>
+                    </Border.Effect>
+                    <StackPanel>
+                        <MenuItem x:Name="CtxUndoItem" Header="Rückgängig" InputGestureText="Strg+Z" Tag="Undo" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxRedoItem" Header="Wiederholen" InputGestureText="Strg+Y" Tag="Redo" Click="Ctx_Click"/>
+                        <Separator x:Name="CtxSepEdit"/>
+                        <MenuItem x:Name="CtxCutItem" Header="Ausschneiden" InputGestureText="Strg+X" Tag="Cut" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxCopyItem" Header="Kopieren" InputGestureText="Strg+C" Tag="Copy" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxPasteItem" Header="Einfügen" InputGestureText="Strg+V" Tag="Paste" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxDeleteItem" Header="Löschen" InputGestureText="Entf" Tag="Delete" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxSelectAllItem" Header="Alles markieren" InputGestureText="Strg+A" Tag="SelectAll" Click="Ctx_Click"/>
+                        <Separator x:Name="CtxSepClipboard"/>
+                        <MenuItem x:Name="CtxFormatJsonItem" Header="JSON formatieren" InputGestureText="Strg+Umschalt+J"
+                                  Tag="FormatJson" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxFormatCodeItem" Header="Code formatieren" InputGestureText="Strg+Umschalt+F"
+                                  Tag="FormatCode" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxPythonCompletionItem" Header="Python-Completion" InputGestureText="Strg+Leertaste"
+                                  Tag="PythonCompletion" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxMarkdownPreviewItem" Header="Markdown-Vorschau aktualisieren"
+                                  Tag="MarkdownRefresh" Click="Ctx_Click"/>
+                        <Separator x:Name="CtxSepFormat"/>
+                        <MenuItem x:Name="CtxNextErrorItem" Header="Nächster Syntaxfehler" InputGestureText="F4"
+                                  Tag="NextSyntaxError" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxSyntaxCheckItem" Header="Syntax-Check" IsCheckable="True" Tag="SyntaxCheck" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxFoldingItem" Header="Code-Folding" IsCheckable="True" Tag="Folding" Click="Ctx_Click"/>
+                        <Separator x:Name="CtxSepSyntax"/>
+                        <MenuItem Header="Suchen…" InputGestureText="Strg+F" Tag="Find" Click="Ctx_Click"/>
+                        <MenuItem Header="Weitersuchen" InputGestureText="F3" Tag="FindNext" Click="Ctx_Click"/>
+                        <MenuItem Header="Ersetzen…" InputGestureText="Strg+H" Tag="Replace" Click="Ctx_Click"/>
+                        <MenuItem Header="Gehe zu Zeile…" InputGestureText="Strg+G" Tag="GoToLine" Click="Ctx_Click"/>
+                        <MenuItem Header="Uhrzeit und Datum" InputGestureText="F5" Tag="InsertDateTime" Click="Ctx_Click"/>
+                        <Separator x:Name="CtxSepSearch"/>
+                        <MenuItem x:Name="CtxSaveItem" Header="Speichern" InputGestureText="Strg+S" Tag="Save" Click="Ctx_Click"/>
+                        <MenuItem Header="Speichern unter…" InputGestureText="Strg+Umschalt+S" Tag="SaveAs" Click="Ctx_Click"/>
+                        <MenuItem Header="Drucken…" InputGestureText="Strg+P" Tag="Print" Click="Ctx_Click"/>
+                        <Separator x:Name="CtxSepSave"/>
+                        <MenuItem x:Name="CtxWrapItem" Header="Zeilenumbruch" IsCheckable="True" Tag="WordWrap" Click="Ctx_Click"/>
+                        <MenuItem Header="Vergrößern" InputGestureText="Strg+Plus" Tag="ZoomIn" Click="Ctx_Click"/>
+                        <MenuItem Header="Verkleinern" InputGestureText="Strg+Minus" Tag="ZoomOut" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxZoomResetItem" Header="Zoom zurücksetzen" InputGestureText="Strg+0" Tag="ZoomReset" Click="Ctx_Click"/>
+                        <MenuItem x:Name="CtxDetachItem" Header="Tab in neues Fenster verschieben"
+                                  InputGestureText="Strg+Umschalt+D" Tag="Detach" Click="Ctx_Click"/>
+                    </StackPanel>
+                </Border>
+            </Popup>
             <GridSplitter Grid.Column="1" x:Name="PreviewSplitter" Visibility="Collapsed"
                           Width="4" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                           Background="{DynamicResource DividerBrush}" ResizeBehavior="PreviousAndNext"/>

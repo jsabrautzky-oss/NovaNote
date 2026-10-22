@@ -127,6 +127,7 @@ namespace NovaNote
             var tab = new TabModel(view);
             view.StateChanged += View_StateChanged;
             view.DirtyChanged += View_DirtyChanged;
+            view.ContextAction += View_ContextAction;
             if (index < 0 || index > Tabs.Count) Tabs.Add(tab);
             else Tabs.Insert(index, tab);
             TabStrip.SelectedItem = tab;
@@ -156,6 +157,7 @@ namespace NovaNote
         {
             view.StateChanged -= View_StateChanged;
             view.DirtyChanged -= View_DirtyChanged;
+            view.ContextAction -= View_ContextAction;
         }
 
         public TabModel FindTab(DocumentView view)
@@ -188,6 +190,48 @@ namespace NovaNote
             _sessionDirty = true;
             FindTab(sender as DocumentView)?.RefreshTitle();
             if (ReferenceEquals(sender, _active?.View)) UpdateTitle();
+        }
+
+        void View_ContextAction(DocumentView view, DocAction action, bool value)
+        {
+            var tab = FindTab(view);
+            if (tab != null && !ReferenceEquals(tab, _active)) ActivateTab(tab);
+            var v = ActiveView;
+            if (v == null) return;
+
+            switch (action)
+            {
+                case DocAction.Undo: v.DoUndo(); break;
+                case DocAction.Redo: v.DoRedo(); break;
+                case DocAction.Cut: v.DoCut(); break;
+                case DocAction.Copy: v.DoCopy(); break;
+                case DocAction.Paste: v.DoPaste(); break;
+                case DocAction.Delete: v.DoDelete(); break;
+                case DocAction.SelectAll: v.DoSelectAll(); break;
+                case DocAction.FormatJson: JsonFormat(); break;
+                case DocAction.FormatCode: FormatCode(); break;
+                case DocAction.PythonCompletion: PythonCompletion(); break;
+                case DocAction.NextSyntaxError: NextSyntaxError(); break;
+                case DocAction.SyntaxCheck: SetSyntaxCheckAll(value); break;
+                case DocAction.Folding: SetFoldingAll(value); break;
+                case DocAction.Find: ShowSearch(false); break;
+                case DocAction.FindNext: FindNext(false); break;
+                case DocAction.Replace: ShowSearch(true); break;
+                case DocAction.GoToLine: ShowGoTo(); break;
+                case DocAction.InsertDateTime: v.InsertDateTime(); break;
+                case DocAction.Save: v.Save(); break;
+                case DocAction.SaveAs: v.SaveAsCore(); break;
+                case DocAction.Print: Print(); break;
+                case DocAction.WordWrap: v.SetWordWrap(value); break;
+                case DocAction.ZoomIn: ZoomBy(10); break;
+                case DocAction.ZoomOut: ZoomBy(-10); break;
+                case DocAction.ZoomReset: v.SetZoom(100); break;
+                case DocAction.Detach: DetachActive(); break;
+            }
+
+            UpdateStatus();
+            UpdateMenuChecks();
+            v.FocusEditor();
         }
 
         void TabStrip_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -829,24 +873,28 @@ namespace NovaNote
             ApplyViewOptionsAll();
         }
 
-        void SyntaxCheck_Click(object sender, RoutedEventArgs e)
+        void SyntaxCheck_Click(object sender, RoutedEventArgs e) => SetSyntaxCheckAll(SyntaxCheckItem.IsChecked);
+
+        void SetSyntaxCheckAll(bool on)
         {
-            SessionStore.Prefs.SyntaxCheck = SyntaxCheckItem.IsChecked;
+            SessionStore.Prefs.SyntaxCheck = on;
             SessionStore.SavePrefs();
             foreach (var w in Application.Current.Windows.OfType<MainWindow>())
-                foreach (var t in w.Tabs) t.View.SetSyntaxCheck(SessionStore.Prefs.SyntaxCheck);
+                foreach (var t in w.Tabs) t.View.SetSyntaxCheck(on);
             UpdateStatus();
             ActiveView?.FocusEditor();
         }
 
         void SyntaxNext_Click(object sender, RoutedEventArgs e) => NextSyntaxError();
 
-        void Folding_Click(object sender, RoutedEventArgs e)
+        void Folding_Click(object sender, RoutedEventArgs e) => SetFoldingAll(FoldingItem.IsChecked);
+
+        void SetFoldingAll(bool on)
         {
-            SessionStore.Prefs.Folding = FoldingItem.IsChecked;
+            SessionStore.Prefs.Folding = on;
             SessionStore.SavePrefs();
             foreach (var w in Application.Current.Windows.OfType<MainWindow>())
-                foreach (var t in w.Tabs) t.View.SetFolding(SessionStore.Prefs.Folding);
+                foreach (var t in w.Tabs) t.View.SetFolding(on);
             ActiveView?.FocusEditor();
         }
 

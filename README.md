@@ -8,6 +8,7 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.2.0-beta
 ## Was kann NovaNote?
 - Dateien bearbeiten: `.txt`, `.md`, `.markdown`, `.py`, `.pyw`, `.cs`, `.csx`, `.yaml`, `.yml`, `.json`, `.jsonc`, `.json5`, `.xml`, `.xsl`, `.xhtml`, `.svg`, `.html`, `.htm`, `.css`, `.js`, `.mjs`, `.ts`, `.cpp`, `.c`, `.h`, `.hpp`
 - Syntax-Check mit roter Wellenlinie und `F4` für den nächsten Fehler
+- Rechtsklick-Menü: Aktionen erscheinen nur, wenn sie passen (Kopieren/Ausschneiden nur mit Auswahl, Einfügen nur mit Zwischenablage, JSON-/Code-Formatierung, Python-Completion, Markdown-Vorschau je nach Sprache)
 - Code-Folding (abschaltbar) und Whitespace-Anzeige
 - Mehrfach-Tabs und Tabs in eigene Fenster lösen
 - Session-Wiederherstellung: Fenster und Tabs beim nächsten Start wieder öffnen
