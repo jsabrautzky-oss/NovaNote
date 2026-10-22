@@ -26,8 +26,10 @@ Das Script erzeugt:
 
 GitHub-Release erzeugen und hochladen (nach `gh auth login` oder mit `GH_TOKEN`):
 ```powershell
-powershell .\release.ps1 -version 0.5.1 -repo jsabrautzky-oss/NovaNote -tag v0.5.1 -title "NovaNote 0.5.1" -prerelease $false
+powershell -Command "& .\release.ps1 -version 0.5.1 -repo jsabrautzky-oss/NovaNote -tag v0.5.1 -title 'NovaNote 0.5.1' -prerelease $false"
+powershell -Command "& .\release.ps1 -skipPack $true"    # nutzt die bereits gepackten Artefakte in Releases/
 ```
+Boolesche Parameter über `-File` werden als String übergeben und schlagen fehl; deshalb `powershell -Command "& .\release.ps1 …"` schreiben. Die Notizen werden per temporärer `release-notes.txt` übergeben (`--notes-file`), weil mehrzeilige Notes als Bash-Argument von `gh` zerlegt werden.
 
 Wichtige Velopack-Parameter:
 - `packId`: `NovaNote`

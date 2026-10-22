@@ -3,7 +3,8 @@ param(
   [string]$repo = "jsabrautzky-oss/NovaNote",
   [string]$tag = "v0.5.1",
   [string]$title = "NovaNote 0.5.1",
-  [bool]$prerelease = $false
+  [bool]$prerelease = $false,
+  [bool]$skipPack = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +12,9 @@ $ErrorActionPreference = "Stop"
 $repoDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $releasesDir = Join-Path $repoDir "Releases"
 
-& (Join-Path $repoDir "installer.ps1") -packVersion $version
+if (-not $skipPack) {
+  & (Join-Path $repoDir "installer.ps1") -packVersion $version
+}
 
 $gh = Get-Command gh -ErrorAction SilentlyContinue
 $ghPath = if ($gh) { $gh.Source } else { "C:\Program Files\GitHub CLI\gh.exe" }
@@ -33,6 +36,9 @@ $notes = @(
   'Hinweis: Die KI ist optional und laeuft nur gegen einen lokalen OpenAI-kompatiblen Server (LM Studio, Ollama, llama-server).'
 ) -join "`n"
 
+$notesFile = Join-Path $releasesDir "release-notes.txt"
+[System.IO.File]::WriteAllText($notesFile, $notes, [System.Text.UTF8Encoding]::new($false))
+
 $assets = @(
   (Join-Path $releasesDir "NovaNote-win-Setup.exe"),
   (Join-Path $releasesDir "NovaNote-win-Portable.zip"),
@@ -45,7 +51,7 @@ $assets = @(
 $delta = Join-Path $releasesDir "NovaNote-$version-delta.nupkg"
 if (Test-Path $delta) { $assets += $delta }
 
-$releaseArgs = @("release", "create", $tag, "--repo", $repo, "--title", $title, "--notes", $notes)
+$releaseArgs = @("release", "create", $tag, "--repo", $repo, "--title", $title, "--notes-file", $notesFile)
 if ($prerelease) { $releaseArgs += "--prerelease" }
 $releaseArgs += $assets
 
