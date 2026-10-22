@@ -19,7 +19,7 @@ namespace NovaNote
         public const string Description = "NovaNote Editor";
 
         /// <summary>Endungen, die mit dem Editor verknüpft werden.</summary>
-        public static readonly string[] Extensions = { ".txt", ".json", ".xml", ".html" };
+        public static readonly string[] Extensions = { ".txt", ".md", ".markdown", ".json", ".xml", ".html" };
 
         /// <summary>Unter Schlüssel im HKCU-Bereich für Klassen/ProgIDs.</summary>
         const string ClassesRoot = @"Software\Classes";

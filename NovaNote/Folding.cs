@@ -16,7 +16,9 @@ namespace NovaNote
                 || lang == DocLanguage.Html
                 || lang == DocLanguage.Css
                 || lang == DocLanguage.Cpp
-                || lang == DocLanguage.JavaScript;
+                || lang == DocLanguage.JavaScript
+                || lang == DocLanguage.CSharp
+                || lang == DocLanguage.Yaml;
         }
 
         static char Closing(char open) => open switch
@@ -34,7 +36,7 @@ namespace NovaNote
 
             bool allowBrackets = lang == DocLanguage.Json;
             bool blockComments = lang != DocLanguage.Json;
-            bool lineComments = lang == DocLanguage.Cpp || lang == DocLanguage.JavaScript;
+            bool lineComments = lang == DocLanguage.Cpp || lang == DocLanguage.JavaScript || lang == DocLanguage.CSharp;
             bool templates = lang == DocLanguage.JavaScript;
 
             int i = 0, n = text.Length;

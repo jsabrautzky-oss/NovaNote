@@ -27,7 +27,7 @@
         </Grid>
         <TextBlock Grid.Row="2" Margin="0,12,0,0" TextWrapping="Wrap"
                    Foreground="{DynamicResource TextBrush}"
-                   Text="WPF-Texteditor für Windows mit AvalonEdit, Themes (hell/dunkel/system), Mehrfach-Tabs, Syntax-Highlighting und Syntax-Check für JSON, XML, HTML, CSS, JavaScript und C++, Code-Folding, Encoding/EOL, Suchen/Ersetzen, Zoom, Drucken und Session-Wiederherstellung."/>
+                   Text="WPF-Texteditor für Windows mit AvalonEdit, Themes (hell/dunkel/system), Mehrfach-Tabs, Syntax-Highlighting und Syntax-Check für JSON, XML, HTML, CSS, JavaScript, C++, Python, C# und YAML, Markdown-Live-Vorschau, Python-LSP/Completion/Formatierung, Code-Folding, Encoding/EOL, Suchen/Ersetzen, Zoom, Drucken und Session-Wiederherstellung."/>
         <TextBlock Grid.Row="3" Margin="0,12,0,0" TextWrapping="Wrap"
                    Foreground="{DynamicResource SubtleTextBrush}">
             <Run Text="GitHub: "/>

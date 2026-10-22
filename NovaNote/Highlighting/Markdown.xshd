@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<SyntaxDefinition name="Markdown" extensions=".md;.markdown"
+                  xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+    <!-- Die foreground-Werte sind Platzhalter; das Theme überschreibt sie pro Sprachfarbe. -->
+    <Color name="Heading" foreground="#7F1551" exampleText="# Heading" />
+    <Color name="Strong" foreground="#0000FF" exampleText="**bold**" />
+    <Color name="Emphasis" foreground="#0000FF" exampleText="*italic*" />
+    <Color name="InlineCode" foreground="#008000" exampleText="`code`" />
+    <Color name="CodeBlock" foreground="#008000" exampleText="```" />
+    <Color name="Quote" foreground="#008000" exampleText="> quote" />
+    <Color name="Link" foreground="#A31515" exampleText="[text](url)" />
+    <Color name="List" foreground="#0000FF" exampleText="- item" />
+    <Color name="Punctuation" foreground="#000000" exampleText="---" />
+
+    <RuleSet>
+        <Rule color="Punctuation">^[-*_]{3}</Rule>
+        <Rule color="Heading">^\x23{1,6}[^\r\n]*</Rule>
+        <Rule color="Quote">^\x3E[^\r\n]*</Rule>
+        <Rule color="CodeBlock">^\x60\x60\x60[^\r\n]*</Rule>
+        <Rule color="List">^\s*[-*+]\s[^\r\n]*</Rule>
+        <Rule color="List">^\s*\d+\.[^\r\n]*</Rule>
+        <Rule color="Link">\[[^\]\r\n]*\]\([^\)\r\n]*\)</Rule>
+
+        <Span color="InlineCode">
+            <Begin>\x60</Begin>
+            <End>\x60</End>
+        </Span>
+        <Span color="Strong">
+            <Begin>\*\*+</Begin>
+            <End>\*\*+</End>
+        </Span>
+        <Span color="Strong">
+            <Begin>__+</Begin>
+            <End>__+</End>
+        </Span>
+        <Span color="Emphasis">
+            <Begin>\*</Begin>
+            <End>\*</End>
+        </Span>
+        <Span color="Emphasis">
+            <Begin>_</Begin>
+            <End>_</End>
+        </Span>
+    </RuleSet>
+
+</SyntaxDefinition>

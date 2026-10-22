@@ -1,8 +1,8 @@
 param(
-  [string]$version = "0.1.0-beta",
+  [string]$version = "0.2.0-beta",
   [string]$repo = "jsabrautzky-oss/NovaNote",
-  [string]$tag = "v0.1.0-beta",
-  [string]$title = "NovaNote 0.1.0-beta",
+  [string]$tag = "v0.2.0-beta",
+  [string]$title = "NovaNote 0.2.0-beta",
   [bool]$prerelease = $true
 )
 
@@ -17,14 +17,21 @@ $gh = Get-Command gh -ErrorAction SilentlyContinue
 $ghPath = if ($gh) { $gh.Source } else { "C:\Program Files\GitHub CLI\gh.exe" }
 
 $notes = @(
-  'Erster Beta-Release von NovaNote.',
+  'NovaNote 0.2.0 - neue Beta mit Markdown, Python, C# und YAML.',
+  '',
+  'Neu:',
+  '- Markdown-Live-Vorschau fuer .md/.markdown',
+  '- Python: Live-Syntax/Diagnosen ueber LSP-Pull oder CLI, Completion (Strg+Leertaste), Formatierung',
+  '- C#: Syntax-Check mit Roslyn und Code-Formatierung (Strg+Umschalt+F)',
+  '- YAML: Syntax-Check mit YamlDotNet und Folding nach Einrueckung',
+  '- Tab-Views werden beim Schließen/Detach disposed',
   '',
   'Enthalten:',
   '- Velopack-Installer (NovaNote-win-Setup.exe)',
   '- Portable-Zip (NovaNote-win-Portable.zip)',
   '- AvalonEdit-Editor mit Syntax-Highlighting, Syntax-Check und Code-Folding',
   '- Themes hell/dunkel/system, Mehrfach-Tabs, Session-Wiederherstellung',
-  '- Dateiendungen .txt/.json/.xml/.html ueber HKCU-ProgID NovaNote.Editor',
+  '- Dateiendungen .txt/.md/.markdown/.json/.xml/.html ueber HKCU-ProgID NovaNote.Editor',
   '',
   'Hinweis: Beta/Prerelease. Velopack-Updates prufen standardmaessig stabile Releases.'
 ) -join "`n"

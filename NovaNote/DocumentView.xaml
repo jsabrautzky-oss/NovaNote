@@ -1,16 +1,36 @@
 <UserControl x:Class="NovaNote.DocumentView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ae="clr-namespace:ICSharpCode.AvalonEdit;assembly=ICSharpCode.AvalonEdit"
-             AllowDrop="True" Drop="View_Drop" DragOver="View_DragOver">
+              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              xmlns:ae="clr-namespace:ICSharpCode.AvalonEdit;assembly=ICSharpCode.AvalonEdit"
+              xmlns:md="clr-namespace:MdXaml;assembly=MdXaml"
+              AllowDrop="True" Drop="View_Drop" DragOver="View_DragOver">
     <Border Margin="8,4,8,4" Background="{DynamicResource EditorBgBrush}"
             BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="8">
-        <ae:TextEditor x:Name="Editor" Background="Transparent" BorderThickness="0"
-                       Foreground="{DynamicResource TextBrush}"
-                       FontFamily="Consolas" FontSize="15"
-                       ShowLineNumbers="True" LineNumbersForeground="{DynamicResource SubtleTextBrush}"
-                       VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                       Padding="4,4,4,4" WordWrap="True"
-                       PreviewMouseWheel="Editor_PreviewMouseWheel"/>
+        <Grid x:Name="LayoutGrid">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="0"/>
+                <ColumnDefinition Width="0"/>
+            </Grid.ColumnDefinitions>
+            <ae:TextEditor Grid.Column="0" x:Name="Editor" Background="Transparent" BorderThickness="0"
+                           Foreground="{DynamicResource TextBrush}"
+                           FontFamily="Consolas" FontSize="15"
+                           ShowLineNumbers="True" LineNumbersForeground="{DynamicResource SubtleTextBrush}"
+                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                           Padding="4,4,4,4" WordWrap="True"
+                           PreviewMouseWheel="Editor_PreviewMouseWheel"/>
+            <GridSplitter Grid.Column="1" x:Name="PreviewSplitter" Visibility="Collapsed"
+                          Width="4" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          Background="{DynamicResource DividerBrush}" ResizeBehavior="PreviousAndNext"/>
+            <Border Grid.Column="2" x:Name="PreviewBorder" Visibility="Collapsed"
+                    Background="{DynamicResource EditorBgBrush}"
+                    BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1,0,0,0">
+                <md:MarkdownScrollViewer x:Name="MarkdownViewer"
+                                         Foreground="{DynamicResource TextBrush}"
+                                         Background="Transparent"
+                                         Margin="8,8,8,8"
+                                         VerticalScrollBarVisibility="Auto"/>
+            </Border>
+        </Grid>
     </Border>
 </UserControl>

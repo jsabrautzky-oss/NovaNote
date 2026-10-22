@@ -115,6 +115,8 @@
                     <MenuItem x:Name="LangAutoItem" Header="Automatisch erkennen" IsCheckable="True" IsChecked="True" Click="LangAuto_Click"/>
                     <Separator/>
                     <MenuItem x:Name="LangJsonFormatItem" Header="JSON formatieren" InputGestureText="Strg+Umschalt+J" Click="LangJsonFormat_Click"/>
+                    <MenuItem x:Name="CodeFormatItem" Header="Code formatieren" InputGestureText="Strg+Umschalt+F" IsEnabled="False" Click="CodeFormat_Click"/>
+                    <MenuItem x:Name="PythonCompletionItem" Header="Python-Completion" InputGestureText="Strg+Leertaste" IsEnabled="False" Click="PythonCompletion_Click"/>
                     <Separator/>
                     <MenuItem x:Name="LangNoneItem" Header="Keine" IsCheckable="True" Click="Language_Click" Tag="None"/>
                     <MenuItem x:Name="LangJsonItem" Header="JSON" IsCheckable="True" Click="Language_Click" Tag="Json"/>
@@ -123,6 +125,10 @@
                     <MenuItem x:Name="LangCssItem" Header="CSS" IsCheckable="True" Click="Language_Click" Tag="Css"/>
                     <MenuItem x:Name="LangJsItem" Header="JavaScript" IsCheckable="True" Click="Language_Click" Tag="JavaScript"/>
                     <MenuItem x:Name="LangCppItem" Header="C++" IsCheckable="True" Click="Language_Click" Tag="Cpp"/>
+                    <MenuItem x:Name="LangMarkdownItem" Header="Markdown" IsCheckable="True" Click="Language_Click" Tag="Markdown"/>
+                    <MenuItem x:Name="LangPythonItem" Header="Python" IsCheckable="True" Click="Language_Click" Tag="Python"/>
+                    <MenuItem x:Name="LangCSharpItem" Header="C#" IsCheckable="True" Click="Language_Click" Tag="CSharp"/>
+                    <MenuItem x:Name="LangYamlItem" Header="YAML" IsCheckable="True" Click="Language_Click" Tag="Yaml"/>
                 </MenuItem>
             </MenuItem>
 

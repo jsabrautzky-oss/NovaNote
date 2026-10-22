@@ -10,7 +10,11 @@ namespace NovaNote
         Html,
         Css,
         JavaScript,
-        Cpp
+        Cpp,
+        Markdown,
+        Python,
+        CSharp,
+        Yaml
     }
 
     public static class DocLanguages
@@ -40,6 +44,14 @@ namespace NovaNote
                 case ".c":
                 case ".h":
                 case ".hpp": return DocLanguage.Cpp;
+                case ".md":
+                case ".markdown": return DocLanguage.Markdown;
+                case ".py":
+                case ".pyw": return DocLanguage.Python;
+                case ".cs":
+                case ".csx": return DocLanguage.CSharp;
+                case ".yaml":
+                case ".yml": return DocLanguage.Yaml;
                 default: return DocLanguage.None;
             }
         }
@@ -74,6 +86,10 @@ namespace NovaNote
                 case DocLanguage.Css: return "CSS";
                 case DocLanguage.JavaScript: return "JavaScript";
                 case DocLanguage.Cpp: return "C++";
+                case DocLanguage.Markdown: return "Markdown";
+                case DocLanguage.Python: return "Python";
+                case DocLanguage.CSharp: return "C#";
+                case DocLanguage.Yaml: return "YAML";
                 default: return "";
             }
         }

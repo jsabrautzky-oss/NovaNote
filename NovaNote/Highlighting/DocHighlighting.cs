@@ -27,6 +27,8 @@ namespace NovaNote
 
         static Dictionary<string, Brush> _brushCache;
         static bool _jsonRegistered;
+        static bool _markdownRegistered;
+        static bool _yamlRegistered;
 
         public static Brush BrushForKey(string key)
         {
@@ -57,6 +59,10 @@ namespace NovaNote
         {
             if (string.IsNullOrEmpty(name)) return TextKey;
             string n = name.ToLowerInvariant();
+            if (n.Contains("heading") || n.Contains("strong") || n.Contains("emphasis")) return KeywordKey;
+            if (n.Contains("quote") || n.Contains("inlinecode") || n.Contains("code")) return CommentKey;
+            if (n.Contains("link")) return StringKey;
+            if (n.Contains("list")) return TagKey;
             if (n.Contains("comment")) return CommentKey;
             if (n == "attributevalue") return StringKey;
             if (n.Contains("attribute")) return AttrKey;
@@ -84,6 +90,16 @@ namespace NovaNote
                 case DocLanguage.Css: return HighlightingManager.Instance.GetDefinition("CSS");
                 case DocLanguage.JavaScript: return HighlightingManager.Instance.GetDefinition("JavaScript");
                 case DocLanguage.Cpp: return HighlightingManager.Instance.GetDefinition("C++");
+                case DocLanguage.Markdown:
+                    EnsureMarkdownRegistered();
+                    return HighlightingManager.Instance.GetDefinition("Markdown");
+                case DocLanguage.Python: return HighlightingManager.Instance.GetDefinition("Python");
+                case DocLanguage.CSharp: return HighlightingManager.Instance.GetDefinition("C#");
+                case DocLanguage.Yaml:
+                    var yaml = HighlightingManager.Instance.GetDefinition("YAML");
+                    if (yaml != null) return yaml;
+                    EnsureYamlCustomRegistered();
+                    return HighlightingManager.Instance.GetDefinition("NovaNote YAML");
                 default: return null;
             }
         }
@@ -93,6 +109,60 @@ namespace NovaNote
             if (_jsonRegistered) return;
             _jsonRegistered = true;
             HighlightingManager.Instance.RegisterHighlighting("JSON", new[] { "json", "jsonc", "json5" }, LoadJsonDefinition);
+        }
+
+        static void EnsureMarkdownRegistered()
+        {
+            if (_markdownRegistered) return;
+            _markdownRegistered = true;
+            HighlightingManager.Instance.RegisterHighlighting("Markdown", new[] { "md", "markdown" }, LoadMarkdownDefinition);
+        }
+
+        static void EnsureYamlCustomRegistered()
+        {
+            if (_yamlRegistered) return;
+            _yamlRegistered = true;
+            HighlightingManager.Instance.RegisterHighlighting("NovaNote YAML", new[] { "yaml", "yml" }, LoadYamlDefinition);
+        }
+
+        static IHighlightingDefinition LoadYamlDefinition()
+        {
+            try
+            {
+                var asm = typeof(DocHighlighting).Assembly;
+                string name = asm.GetManifestResourceNames()
+                    .FirstOrDefault(n => n.EndsWith("Yaml.xshd", StringComparison.OrdinalIgnoreCase));
+                if (name == null) return null;
+                using var stream = asm.GetManifestResourceStream(name);
+                if (stream == null) return null;
+                using var reader = XmlReader.Create(stream);
+                var xshd = HighlightingLoader.LoadXshd(reader);
+                return HighlightingLoader.Load(xshd, HighlightingManager.Instance);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        static IHighlightingDefinition LoadMarkdownDefinition()
+        {
+            try
+            {
+                var asm = typeof(DocHighlighting).Assembly;
+                string name = asm.GetManifestResourceNames()
+                    .FirstOrDefault(n => n.EndsWith("Markdown.xshd", StringComparison.OrdinalIgnoreCase));
+                if (name == null) return null;
+                using var stream = asm.GetManifestResourceStream(name);
+                if (stream == null) return null;
+                using var reader = XmlReader.Create(stream);
+                var xshd = HighlightingLoader.LoadXshd(reader);
+                return HighlightingLoader.Load(xshd, HighlightingManager.Instance);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         static IHighlightingDefinition LoadJsonDefinition()

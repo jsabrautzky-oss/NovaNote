@@ -63,7 +63,7 @@ namespace NovaNote
                 }
             }
 
-            // Dateipfad erkennen, z. B. durch Doppelklick auf .txt/.json/.xml/.html.
+            // Dateipfad erkennen, z. B. durch Doppelklick auf .txt/.md/.markdown/.json/.xml/.html.
             string file = args.FirstOrDefault(a => !a.StartsWith("/") && !a.StartsWith("-"));
 
             // Session wiederherstellen, falls aktiv und vorhanden.

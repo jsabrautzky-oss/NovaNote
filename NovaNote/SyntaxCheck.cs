@@ -6,6 +6,10 @@ using System.Text.Json;
 using System.Xml;
 using Acornima;
 using HtmlAgilityPack;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using YamlDotNet.Core;
+using YamlDotNet.Serialization;
 
 namespace NovaNote
 {
@@ -24,6 +28,8 @@ namespace NovaNote
         public static bool ShouldCheck(DocLanguage lang, string path)
         {
             if (lang == DocLanguage.None) return false;
+            if (lang == DocLanguage.Markdown) return false;
+            if (lang == DocLanguage.Python) return false;
             if (lang == DocLanguage.JavaScript && !string.IsNullOrEmpty(path))
             {
                 string ext = Path.GetExtension(path).ToLowerInvariant();
@@ -42,6 +48,8 @@ namespace NovaNote
                 case DocLanguage.JavaScript: return ValidateJs(text);
                 case DocLanguage.Css: return ValidateCss(text);
                 case DocLanguage.Cpp: return ValidateCpp(text);
+                case DocLanguage.CSharp: return ValidateCSharp(text);
+                case DocLanguage.Yaml: return ValidateYaml(text);
                 default: return new List<SyntaxError>();
             }
         }
@@ -58,6 +66,50 @@ namespace NovaNote
                 Length = Math.Min(Math.Max(rest, 1), maxLength),
                 Message = message
             };
+        }
+
+        static List<SyntaxError> ValidateCSharp(string text)
+        {
+            var errors = new List<SyntaxError>();
+            var tree = CSharpSyntaxTree.ParseText(text);
+            foreach (var d in tree.GetDiagnostics())
+            {
+                if (d.Severity != DiagnosticSeverity.Error) continue;
+                var span = d.Location.GetLineSpan();
+                int line = span.StartLinePosition.Line;
+                int col = span.StartLinePosition.Character;
+                errors.Add(MakeLine(text, line, col, d.GetMessage()));
+                if (errors.Count >= MaxErrors) break;
+            }
+            Limit(errors);
+            return errors;
+        }
+
+        static List<SyntaxError> ValidateYaml(string text)
+        {
+            var errors = new List<SyntaxError>();
+            try
+            {
+                var deserializer = new DeserializerBuilder().Build();
+                deserializer.Deserialize(new StringReader(text));
+            }
+            catch (YamlException ex)
+            {
+                int line = (int)ex.Start.Line;
+                int col = (int)ex.Start.Column;
+                errors.Add(MakeLine(text, line, col, ex.Message));
+            }
+            return errors;
+        }
+
+        static SyntaxError MakeLine(string text, int line1, int col1, string message)
+        {
+            int lineStart = LineStart(text, line1);
+            int col = Math.Max(col1 - 1, 0);
+            int offset = Math.Clamp(lineStart + col, 0, text.Length);
+            int remaining = Math.Max(LineLength(text, lineStart) - col, 1);
+            int len = Math.Min(remaining, 60);
+            return new SyntaxError { Offset = offset, Length = len, Message = message };
         }
 
         static void Limit(List<SyntaxError> errors)
@@ -203,7 +255,7 @@ namespace NovaNote
             var options = new ParserOptions { Tolerant = true, ErrorHandler = collector };
             try
             {
-                new Parser(options).ParseScript(text);
+                new Acornima.Parser(options).ParseScript(text);
             }
             catch (ParseErrorException ex)
             {

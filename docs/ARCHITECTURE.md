@@ -1,12 +1,12 @@
 # NovaNote — interne Architektur-Landkarte
 
 Repo: https://github.com/jsabrautzky-oss/NovaNote  
-Aktuelle Beta: 0.1.0-beta  
+Aktuelle Beta: 0.2.0-beta  
 
 Diese Datei ist nur für interne Coding-/KI-Agenten gedacht und nicht für öffentliche Nutzerdoku. Sie soll Scannen des ganzen Codes vermeiden. Alles Wichtige ist hier zusammengefasst: Komponenten, Abhängigkeiten, öffentliche APIs, Fluss, Fallstricke.
 
 ## Zweck
-WPF-Editor „NovaNote“ für Windows (.NET 9) mit AvalonEdit-Editor, Syntax-Highlighting, Syntax-Check mit roter Wellenlinie, Code-Folding, Mehrfach-Tabs, Session-Wiederherstellung, Theme (hell/dunkel/system), Drucken, Suchen/Ersetzen, Goto, Encoding/EOL-Umschaltung, Drag & Drop, Tab-Detach, Velopack-Installer und Dateiendungen `.txt/.json/.xml/.html`.
+WPF-Editor „NovaNote“ für Windows (.NET 9) mit AvalonEdit-Editor, Syntax-Highlighting, Syntax-Check mit roter Wellenlinie, Code-Folding, Markdown-Live-Vorschau für `.md/.markdown`, Python-LSP/Live-Check/Completion/Formatierung, C#-Roslyn-Check/Formatierung, YAML-Check/Indent-Folding, Mehrfach-Tabs, Session-Wiederherstellung, Theme (hell/dunkel/system), Drucken, Suchen/Ersetzen, Goto, Encoding/EOL-Umschaltung, Drag & Drop, Tab-Detach, Velopack-Installer und verknüpfte Dateiendungen `.txt/.md/.markdown/.json/.xml/.html` (ProgID `NovaNote.Editor`, nur HKCU).
 
 ## Build / Installer
 ```powershell
@@ -26,7 +26,7 @@ Das Script erzeugt:
 
 GitHub-Release erzeugen und hochladen (nach `gh auth login` oder mit `GH_TOKEN`):
 ```powershell
-powershell .\release.ps1 -version 0.1.0-beta -repo jsabrautzky-oss/NovaNote -tag v0.1.0-beta -title "NovaNote 0.1.0-beta" -prerelease $true
+powershell .\release.ps1 -version 0.2.0-beta -repo jsabrautzky-oss/NovaNote -tag v0.2.0-beta -title "NovaNote 0.2.0-beta" -prerelease $true
 ```
 
 Wichtige Velopack-Parameter:
@@ -37,7 +37,7 @@ Wichtige Velopack-Parameter:
 - `runtime`: `win-x64`
 
 Kein Testframework im Repo. Frühere Verifikation lief über temporären WPF-Harness:
-`C:\Users\juerg\AppData\Local\Temp\opencode\syntaxTest` (referenziert `NovaNote/NovaNote.csproj`; prüft Syntax-Check, Folding, Theme-Brushes, Renderer-Geometrien). Harness ist nicht Teil des Projekts.
+`C:\Users\juerg\AppData\Local\Temp\opencode\syntaxTest` (referenziert `NovaNote/NovaNote.csproj`; prüft Syntax-Check, Folding, Theme-Brushes, Renderer-Geometrien, Markdown-Preview-Visibility/live update sowie Python/C#/YAML-Extensions, Syntax-Checker, Highlight-Definitionen, C#-/YAML-UI-Checks und YAML-Indent-Folding). Harness ist nicht Teil des Projekts.
 
 ## NuGet-Pakete
 | Paket | Zweck | Genutzte API |
@@ -46,26 +46,37 @@ Kein Testframework im Repo. Frühere Verifikation lief über temporären WPF-Har
 | `Acornima` 1.9.0 | JS-Parsing für Syntax-Check | `Parser(ParserOptions{Tolerant,ErrorHandler}).ParseScript(string)`, `ParseErrorCollector`, `ParseError.Index/LineNumber/Column/Description`, `ParseErrorException` |
 | `HtmlAgilityPack` 1.13.1 | HTML-Parsing für Syntax-Check | `HtmlDocument.LoadHtml(string)`, `HtmlDocument.ParseErrors`, `HtmlParseErrorCode`, `HtmlDocument.MaxDepthLevel` (static!) |
 | `System.Text.Encoding.CodePages` 9.0.11 | ANSI/DOS-Encoding | `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)` in `Codec.cs` |
+| `MdXaml` 1.27.0 | Markdown-Live-Vorschau | `md:MarkdownScrollViewer`, `Markdown`-Property im `DocumentView` |
+| `Microsoft.CodeAnalysis.CSharp` 5.9.0 | C#-Syntax-Check | `CSharpSyntaxTree.ParseText(text).GetDiagnostics()`, `DiagnosticSeverity.Error`, `Location.GetLineSpan()` |
+| `Microsoft.CodeAnalysis.CSharp.Workspaces` 5.9.0 | C#-Formatierung | `Formatter.Format(root, workspace, workspace.Options, CancellationToken.None)`, `Microsoft.CodeAnalysis.AdhocWorkspace` |
+| `YamlDotNet` 18.1.0 | YAML-Syntax-Check | `DeserializerBuilder().Build().Deserialize(new StringReader(text))`, `YamlDotNet.Core.YamlException`, `YamlException.Start.Line/Column` (`long` → `int`) |
 | `Velopack` 1.2.161 | Installer, Updates, FirstRun/AfterUpdate/BeforeUninstall-Hooks | `VelopackApp.Build().SetAppUserModelId(...).SetArgs(...).Run()` |
 
-JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`.
+JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`. Python-LSP ist als eigener JSON-RPC stdio-Client (`PythonLanguageServerClient.cs`) implementiert; das NuGet-Paket `AvalonEdit.Lsp` ist nicht verfügbar.
 
 ## Dateiübersicht und Abhängigkeiten
 | Datei | Rolle | Wichtige Zusammenhänge |
 |---|---|---|
-| `NovaNote.csproj` | `net9.0-windows`, `UseWPF`, `WinExe`, `StartupObject=NovaNote.Program`, Packages, embedded `Highlighting/Json.xshd` | Assembly/RootNamespace `NovaNote` |
+| `NovaNote.csproj` | `net9.0-windows`, `UseWPF`, `WinExe`, `StartupObject=NovaNote.Program`, Packages, embedded `Highlighting/Json.xshd`, `Highlighting/Markdown.xshd` und `Highlighting/Yaml.xshd` | Assembly/RootNamespace `NovaNote` |
 | `Program.cs` | echter Einstiegspunkt, Velopack zuerst, dann WPF `App.Run()` | setzt `App.StartupArgs`, ruft `VelopackApp.Build().SetAppUserModelId(FileAssociationHelper.ProgId).SetArgs(args).Run()` |
 | `App.xaml` / `App.xaml.cs` | merged Dicts `Theme/Light.xaml` + `Theme/Controls.xaml`, Argumente `/?`, `/N`, `/S`, Dateipfad, Session-Windows | nutzt `App.StartupArgs`, ruft `SessionStore.LoadPrefs()`, `ThemeService.SetMode()`, erstellt `MainWindow` |
 | `MainWindow.xaml(.cs)` | Fenster, Tab-UI, Menü, Statusbar, RoutedCommands+KeyBindings, Dialogsteuerung, Session speichern | besitzt `ObservableCollection<TabModel> Tabs`, `ActiveView`; verwendet `DocumentView`, Dialoge, `ThemeService`, `SessionStore`, `Codec` |
-| `DocumentView.xaml(.cs)` | zentrale Editor-Komponente (UserControl mit `ae:TextEditor x:Name="Editor"`) | AvalonEdit-Dokument, Highlighting, Syntax-Check, Folding, Undo, Encoding/EOL, Search, Print, Session-Restore; Events `StateChanged`, `DirtyChanged` |
-| `FileAssociationHelper.cs` | HKCU-Dateizuordnungen, ProgID, Velopack-Fluent-Adapter | ProgID `NovaNote.Editor`, Description `NovaNote Editor`, Endungen `.txt/.json/.xml/.html`; `WithFirstRun/WithAfterUpdate/WithBeforeUninstall` |
-| `Highlight.cs` | `DocLanguage` (None/Json/Xml/Html/Css/JavaScript/Cpp), `DocLanguages.FromExtension/DetectContent/DisplayName` | wird von DocumentView/MainWindow/Syntax/Folding verwendet |
+| `DocumentView.xaml(.cs)` | zentrale Editor-Komponente (UserControl mit `ae:TextEditor x:Name="Editor"` und `md:MarkdownScrollViewer x:Name="MarkdownViewer"`) | AvalonEdit-Dokument, Highlighting, Markdown-Preview, Python-LSP/Completion/Diagnostics, C#-/YAML-Format/Folding, Syntax-Check, Undo, Encoding/EOL, Search, Print, Session-Restore, Dispose von Timern/LSP; Events `StateChanged`, `DirtyChanged` |
+| `FileAssociationHelper.cs` | HKCU-Dateizuordnungen, ProgID, Velopack-Fluent-Adapter | ProgID `NovaNote.Editor`, Description `NovaNote Editor`, Endungen `.txt/.md/.markdown/.py/.pyw/.cs/.yaml/.yml/.json/.xml/.html`; `WithFirstRun/WithAfterUpdate/WithBeforeUninstall` |
+| `Highlight.cs` | `DocLanguage` (None/Json/Xml/Html/Css/JavaScript/Cpp/Markdown/Python/CSharp/Yaml), `DocLanguages.FromExtension/DetectContent/DisplayName` | wird von DocumentView/MainWindow/Syntax/Folding verwendet; `.md/.markdown` → Markdown, `.py/.pyw` → Python, `.cs/.csx` → CSharp, `.yaml/.yml` → Yaml; Enum nur am Ende anhängen, damit Session-Language-Ints kompatibel bleiben |
 | `Codec.cs` | Encoding/EOL: `NovaNoteEncoding`, `LineEnding`, Detect/Decode/Encode/NormalizeToLf/ApplyEol | registriert CodePages-Provider; von DocumentView/Statusbar/session genutzt |
-| `Highlighting/DocHighlighting.cs` | Theme-Farb-Colorizer und XSHD-Definitionen | `ThemeHighlightingColorizer`, `DefinitionFor(DocLanguage)`, `InvalidateBrushes()`, `BrushForKey(string)`; JSON über embedded `Json.xshd`; XML/HTML/CSS/JS/C++ über AvalonEdit-XSHD |
+| `Highlighting/DocHighlighting.cs` | Theme-Farb-Colorizer und XSHD-Definitionen | `ThemeHighlightingColorizer`, `DefinitionFor(DocLanguage)`, `InvalidateBrushes()`, `BrushForKey(string)`; JSON über embedded `Json.xshd`; Markdown über embedded `Markdown.xshd`; Python/C# über AvalonEdit-Standarddefinitionen `Python`/`C#`; YAML über AvalonEdit-Standard `YAML` oder fallback embedded `Yaml.xshd` mit eigener Definition `NovaNote YAML`; XML/HTML/CSS/JS/C++ über AvalonEdit-XSHD |
 | `Highlighting/Json.xshd` | Embedded JSON-Highlighting | LogicalName `NovaNote.Highlighting.Json.xshd` |
-| `SyntaxCheck.cs` | Fehlerliste für Syntax-Check | `SyntaxError {Offset,Length,Message}`, `SyntaxChecker.Validate(lang,text)`, `ShouldCheck(lang,path)`; nutzt Json/Xml/HAP/Acornima/CSS/C++-Scanner |
+| `Highlighting/Markdown.xshd` | Embedded Markdown-Highlighting | LogicalName `NovaNote.Highlighting.Markdown.xshd`; AvalonEdit-Regexes nutzen `\x23/\x3E/\x60`, damit `#` nicht als Regex-Kommentar behandelt wird |
+| `Highlighting/Yaml.xshd` | Embedded YAML-Highlighting-Fallback | LogicalName `NovaNote.Highlighting.Yaml.xshd`; wird nur genutzt, wenn AvalonEdit keine `YAML`-Standarddefinition liefert; Regexes vermeiden `#` als Regex-Kommentar durch `\\x23` |
+| `SyntaxCheck.cs` | Fehlerliste für Syntax-Check | `SyntaxError {Offset,Length,Message}`, `SyntaxChecker.Validate(lang,text)`, `ShouldCheck(lang,path)`; nutzt Json/Xml/HAP/Acornima/CSS/C++-Scanner, C#-Roslyn und YAML-YamlDotNet; Markdown wird übersprungen; Python wird in `DocumentView` separat über LSP/CLI geprüft, nicht durch `SyntaxChecker.Validate` |
 | `SyntaxErrorRenderer.cs` | rote Wellenlinie als `IBackgroundRenderer` auf `KnownLayer.Selection` | `BackgroundGeometryBuilder.GetRectsForSegment`, Brush-Resolver → `AppBrush("SyntaxErrorBrush")` |
-| `Folding.cs` | `FoldingScanner.CreateBrackets` für JSON/CSS/JS/C++ | XML/HTML nutzen AvalonEdit `XmlFoldingStrategy` in DocumentView |
+| `Folding.cs` | `FoldingScanner.CreateBrackets` für JSON/CSS/JS/C++/C# | XML/HTML nutzen AvalonEdit `XmlFoldingStrategy` in DocumentView; YAML nutzt `IndentFoldingStrategy`; C# nutzt `lineComments` im Bracket-Scanner |
+| `PythonToolRunner.cs` | Python-/CLI-/LSP-Erkennung | cached async detection für `python`, `py_compile`/`ruff`/`flake8`, `ruff format`/`black`/`autopep8`, `pyright-langserver --stdio` oder `python -m ruff server`; lokale Umgebung hat `Python 3.12.9` und `ruff 0.14.10`, nicht `pyright`/`black`/`autopep8` |
+| `PythonSyntaxChecker.cs` | Python-CLI-Live-Check | temp `.py`, `python -m py_compile` oder `python -m ruff check`/`python -m flake8`, parse Zeile/Column zu `SyntaxError` |
+| `PythonFormatter.cs` | Python-CLI-Formatierung | temp `.py`, `python -m ruff format`, sonst `black --fast`/`autopep8 --in-place`, Ergebnis oder Fehlermeldung |
+| `PythonLanguageServerClient.cs` | eigener Python-LSP-Client | stdio JSON-RPC mit `Content-Length`, `initialize/initialized/didOpen/didChange/completion/hover/publishDiagnostics/textDocument/diagnostic`; `didOpen.text` und `didChange.version` gehören in `textDocument`; Params-Key muss `params` sein; Dispose killt Prozess |
+| `IndentFoldingStrategy.cs` | YAML-Folding | `UpdateFoldings(manager, document)`, `CreateFoldings(document, maxFoldings)` mit `NewFolding { StartOffset, EndOffset, Name }`, sortiert nach StartOffset; nutzt `document.GetText(offset,length)` |
 | `Theme/Light.xaml`, `Theme/Dark.xaml` | Theme-Farb-Brushes | u. a. `EditorBgBrush`, `TextBrush`, `SubtleTextBrush`, `SelectionBrush`, `Syntax*Brush`, `SyntaxErrorBrush` |
 | `Theme/Controls.xaml` | Control-Styles für WPF-Controls | global gemerged |
 | `Theme/ThemeService.cs` | hell/dunkel/system, DWM-Titelleiste, `ThemeChanged` | ersetzt gemergte Theme-Dictionary in `Application.Current.Resources.MergedDictionaries` |
@@ -83,8 +94,11 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`.
 3. `MainWindow` erzeugt pro Tab `DocumentView` über `NewView()` und hält `TabModel { View, Title, Width }`.
 4. `DocumentView` kapselt AvalonEdit: öffentliche API bewusst stabil (kein `RichTextBox` mehr; alles über `Editor.CaretOffset`, `Editor.SelectionStart/Length`, `Editor.Select`, `Editor.Document`, `Editor.ScrollTo`, `Editor.TextArea`).
 5. `Document.TextChanged` setzt Dirty und startet Debounce-Timer:
-   - Syntax-Check: 400 ms, Text-Snapshot, `Task.Run`, Rückkehr über `Dispatcher`, Guard `ReferenceEquals(_syntaxCts, cts)`.
-   - Folding: 350 ms; JSON/CSS/JS/C++ Hintergrund-Scan; XML/HTML synchron `XmlFoldingStrategy`.
+    - Syntax-Check: 400 ms, Text-Snapshot, `Task.Run`, Rückkehr über `Dispatcher`, Guard `ReferenceEquals(_syntaxCts, cts)`.
+    - Folding: 350 ms; JSON/CSS/JS/C++ Hintergrund-Scan; XML/HTML synchron `XmlFoldingStrategy`.
+    - Markdown-Preview: nutzt den 400-ms-`_syntaxTimer`; nach Tick wird `MarkdownViewer.Markdown = Editor.Text` gesetzt, wenn `Lang == Markdown` oder Pfad `.md/.markdown` ist.
+    - Python-LSP: der Tick sendet zuerst `SendPythonDidChange()`, dann `RunSyntaxCheck()`. Wenn der LSP ready ist, zieht `PullPythonDiagnostics()` `textDocument/diagnostic`; bei Pull-Failure nutzt `RunSyntaxCheck` CLI `PythonSyntaxChecker` als Fallback. `UpdatePythonLsp()` startet `pyright-langserver` oder `python -m ruff server`; Diagnostics aus `publishDiagnostics` und Pull werden zu `SyntaxError` mit `Severity == 1` gemappt.
+    - YAML-Folding: `RunFolding` nutzt `_indentFolding.UpdateFoldings(_foldingManager, Doc)` für `DocLanguage.Yaml`.
 6. `MainWindow.UpdateStatusNow()` liest `v.GetStatus()`, `v.SyntaxStatus`, `v.Enc/Eol/Zoom/StatusLanguage` und aktualisiert `StatusSyntax` mit `SyntaxErrorBrush`.
 7. Session wird beim Schließen geserialized (`SessionStore.SaveSession`), Preferences bei Menü-Toggles (`SavePrefs`).
 
@@ -104,11 +118,11 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`.
 
 ## Öffentliche API (Kurzfassung)
 ### `DocumentView`
-- Eigenschaften: `Path_`, `IsDirty`, `Enc`, `Eol`, `Zoom`, `WordWrap`, `Lang`, `StatusLanguage`, `TabTitle`, `SyntaxErrors`, `SyntaxStatus`, `HasSyntaxErrors`, `SyntaxCheckEnabled`, `FoldingEnabled`, `CanUndo/CanRedo`
+- Eigenschaften: `Path_`, `IsDirty`, `Enc`, `Eol`, `Zoom`, `WordWrap`, `Lang`, `StatusLanguage`, `TabTitle`, `SyntaxErrors`, `SyntaxStatus`, `HasSyntaxErrors`, `SyntaxCheckEnabled`, `FoldingEnabled`, `CanUndo/CanRedo`, `PythonLspReady`, `FormatSupported`
 - Text/Status: `PlainText()`, `CurrentText`, `LineCount`, `GetStatus()`, `StatusCaret`, `StatusSelection`, `GetScrollState()`, `RestoreScrollState()`
 - Bearbeiten/Navigation: `SetFont`, `SetBaseFont`, `SetZoom`, `SetWordWrap`, `SetEncoding`, `SetEol`, `SetLanguage`, `DetectLanguage`, `ReapplyHighlight`, `DoUndo/DoRedo/ClearUndoStack`, `DoCut/Copy/Paste/Delete/SelectAll`, `FocusEditor`, `GoToLine`, `InsertDateTime`
 - Syntax/Folding: `SetSyntaxCheck(bool)`, `GoToNextSyntaxError()`, `SetFolding(bool)`
-- Dateien: `OpenFile(string)`, `PromptDirty()`, `SavePath()`, `Save()`, `SaveAsCore()`, `WriteFile(string)`, `ReplaceText(string)`, `FormatJson(out string)`
+- Dateien: `OpenFile(string)`, `PromptDirty()`, `SavePath()`, `Save()`, `SaveAsCore()`, `WriteFile(string)`, `ReplaceText(string)`, `FormatJson(out string)`, `FormatCodeAsync()`, `ShowPythonCompletionAsync()`, `Dispose()`
 - Suche/Drucken/Session: `DoSearch`, `ReplaceCurrent`, `ReplaceAll`, `Print(...)`, `RestoreSession(...)`, `TransferOut()`
 
 ### `MainWindow`
@@ -116,7 +130,8 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`.
 - statische globale Zustände: `BaseFamily/BaseStyle/BaseWeight/BaseSize`, `LastPrinterName`, `MargL/T/R/B`, `ClosedHistory`
 - Tab/Datei: `NewView()`, `FindTab(view)`, `OpenInNewTab(path)`, `CloseTab(tab)`
 - Suche/Dialoge: `DoSearch`, `ReplaceCurrent`, `ReplaceAll`, `ShowSearch(bool)`, `ShowGoTo()`, `GoToLine(int)`, `SaveSearchArgs`, `SetPrintMargins`
-- `Commands` mit Bindings: Ctrl+T/O/S/Shift+S/P/F/F3/Shift+F3/Ctrl+H/Ctrl+G/F5/Zoom/Shift+W/Ctrl+Shift+T/Ctrl+Tab/Ctrl+Shift+Tab/Ctrl+Shift+D/Ctrl+Shift+W/`Ctrl+Shift+J` JSON-Format/`F4` nächster Syntaxfehler.
+- `Commands` mit Bindings: Ctrl+T/O/S/Shift+S/P/F/F3/Shift+F3/Ctrl+H/Ctrl+G/F5/Zoom/Shift+W/Ctrl+Shift+T/Ctrl+Tab/Ctrl+Shift+Tab/Ctrl+Shift+D/Ctrl+Shift+W/`Ctrl+Shift+J` JSON-Format/`Ctrl+Shift+F` Code-Format (Python/C#)/`Ctrl+Space` Python-Completion/`F4` nächster Syntaxfehler.
+- Menü „Sprachen“ enthält Markdown, Python, C#, YAML sowie `CodeFormatItem` (Python/C#) und `PythonCompletionItem` (nur wenn Python-LSP ready).
 
 ### `SessionStore`
 - `AppPrefs` (siehe oben), `LoadPrefs()`, `SavePrefs()`, `HasSession`, `LoadSession()`, `SaveSession(SessionState)`, `ClearSession()`
@@ -128,17 +143,17 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`.
 - Ersetszt Theme-Dictionary durch `pack://application:,,,/Theme/Dark.xaml` oder `Light.xaml` (nur gültig, wenn das Theme im Entry-Assembly liegt).
 
 ### `DocHighlighting`
-- `DefinitionFor(DocLanguage)`, `ThemeHighlightingColorizer`, `BrushForKey`, `BrushForColorName`, `InvalidateBrushes`
+- `DefinitionFor(DocLanguage)`, `ThemeHighlightingColorizer`, `BrushForKey`, `BrushForColorName`, `InvalidateBrushes`; Markdown über `EnsureMarkdownRegistered()` aus `Markdown.xshd`, Python/C# über AvalonEdit-Standard `Python`/`C#`, YAML über Standard `YAML` oder `EnsureYamlCustomRegistered()` aus `Yaml.xshd`
 - Theme-Brush-Keys: `TextBrush`, `SyntaxStringBrush`, `SyntaxNumberBrush`, `SyntaxKeywordBrush`, `SyntaxKeyBrush`, `SyntaxPunctBrush`, `SyntaxTagBrush`, `SyntaxAttrBrush`, `SyntaxCommentBrush`, `SyntaxPreprocBrush`, `SyntaxErrorBrush`
 
 ### `SyntaxChecker`
 - `MaxErrors=100`, `MaxCheckedChars=2_000_000`
-- `ShouldCheck(lang, path)`: `None` false; JS false bei `.ts/.mts/.cts`
-- `Validate(lang, text)` → `List<SyntaxError>` mit Dokument-Offset (LF-normalisiert)
+- `ShouldCheck(lang, path)`: `None` false; `Markdown` false; `Python` false; JS false bei `.ts/.mts/.cts`
+- `Validate(lang, text)` → `List<SyntaxError>` mit Dokument-Offset (LF-normalisiert); C# nutzt Roslyn `Location.GetLineSpan()` (line/character 0-based), YAML nutzt `YamlException.Start.Line/Column` (long, 1-based?) → `MakeLine`
 
 ### `FoldingScanner`
 - `MaxFoldedChars=1_000_000`, `MaxFoldings=500`
-- `ShouldFold`: Json/Xml/Html/Css/Cpp/JavaScript
+- `ShouldFold`: Json/Xml/Html/Css/Cpp/JavaScript/CSharp/Yaml; YAML wird aber in `DocumentView.RunFolding` über `IndentFoldingStrategy` behandelt und nicht über `CreateBrackets` gescannt
 - `CreateBrackets(text, lang, out firstErrorOffset)`: nur mehrzeilige Blöcke, `{...}` und in JSON auch `[...]`; ignoriert Strings, `//`/`/* */` je nach Sprache, JS-Template-Literals.
 
 ## Testharness-Muster (wenn KI UI verifizieren will)
@@ -169,6 +184,7 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`.
 20. **Session/Prefs**: Dateien liegen in `%APPDATA%\NovaNote\` (`einstellungen.json`, `sitzung.json`). KI sollte nicht testen, wenn sie echte Nutzerdaten zerstören will; Harness darf `LoadPrefs()` nutzen, aber keine `SavePrefs()`-Seiteffekte ohne Bedacht.
 21. **Public-API-Stabilität**: Dialoge/MainWindow erwarten die dokumentierte `DocumentView`-API. Neue interne Editor-API (z. B. direkte AvalonEdit-Zugriffe) nur wo nötig; `Editor` ist in XAML internal, Harness findet TextArea/TextView/FoldingManager über VisualTree oder `TextArea.GetService(typeof(FoldingManager))`.
 22. **UTF-8-Encoding der Quelltexte**: Deutsch im UI/Kommentaren ist UTF-8. Ältere PowerShell-Reparaturen konnten UTF-8 als CP1252 lesen und doppelkodieren. Quelltext-Bearbeitungen in PowerShell nur mit expliziter UTF-8-E/A-Routine machen.
+23. **Python-LSP/CLI und Dispatcher**: Python-LSP startet async; wenn der LSP nicht ready ist, nutzt `RunSyntaxCheck` den Python-CLI-Fallback. `ReplaceFormatted` und Python-Completion marshalieren UI-Arbeit über `Dispatcher.Invoke`, damit Formatierung/Completion auch ohne UI-SynchronizationContext (temp-Harness) keine Thread-Zugriffsfehler erzeugt. UI-Handler wie `MainWindow.FormatCode()` marshalieren MessageBox/UpdateStatus nach `await` ebenfalls über Dispatcher.
 
 ## Kurzregeln für KI
 - Nicht den ganzen Code scannen; diese README als Landkarte nutzen.

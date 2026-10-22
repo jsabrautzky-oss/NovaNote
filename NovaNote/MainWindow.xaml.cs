@@ -135,7 +135,7 @@ namespace NovaNote
             return tab;
         }
 
-        void RemoveTab(TabModel tab)
+        void RemoveTab(TabModel tab, bool disposeView = true)
         {
             int idx = Tabs.IndexOf(tab);
             Unhook(tab.View);
@@ -149,6 +149,7 @@ namespace NovaNote
             }
             UpdateTabWidths();
             _sessionDirty = true;
+            if (disposeView) tab.View.Dispose();
         }
 
         void Unhook(DocumentView view)
@@ -232,7 +233,7 @@ namespace NovaNote
         {
             var dlg = new OpenFileDialog
             {
-                Filter = "Textdokumente (*.txt)|*.txt|Alle Dateien (*.*)|*.*",
+                Filter = "Textdokumente (*.txt)|*.txt|Markdown (*.md)|*.md|Python (*.py)|*.py|C# (*.cs)|*.cs|YAML (*.yaml)|*.yaml;*.yml|Alle Dateien (*.*)|*.*",
                 FilterIndex = 1
             };
             var p = ActiveView?.Path_;
@@ -306,7 +307,7 @@ namespace NovaNote
         {
             if (!SessionStore.Prefs.MultiTab || _active == null) return;
             var view = _active.View;
-            RemoveTab(_active);
+            RemoveTab(_active, false);
             if (Tabs.Count == 0) AddView(NewView());
             var w = new MainWindow(false, -1, null) { Detached = true };
             w.AddView(view);
@@ -386,7 +387,13 @@ namespace NovaNote
             LangCssItem.IsChecked = lang == DocLanguage.Css;
             LangJsItem.IsChecked = lang == DocLanguage.JavaScript;
             LangCppItem.IsChecked = lang == DocLanguage.Cpp;
+            LangMarkdownItem.IsChecked = lang == DocLanguage.Markdown;
+            LangPythonItem.IsChecked = lang == DocLanguage.Python;
+            LangCSharpItem.IsChecked = lang == DocLanguage.CSharp;
+            LangYamlItem.IsChecked = lang == DocLanguage.Yaml;
             LangJsonFormatItem.IsEnabled = lang == DocLanguage.Json;
+            CodeFormatItem.IsEnabled = ActiveView?.FormatSupported == true;
+            PythonCompletionItem.IsEnabled = ActiveView?.PythonLspReady == true;
         }
 
         void UpdateMenuChecks()
@@ -522,6 +529,7 @@ namespace NovaNote
             if (_closingForUpdate)
             {
                 _closingForUpdate = false;
+                foreach (var tab in Tabs.ToList()) tab.View.Dispose();
                 return;
             }
 
@@ -550,6 +558,7 @@ namespace NovaNote
             _status?.Stop();
             SaveSessionNow();
             SessionStore.SavePrefs();
+            foreach (var tab in tabs) tab.View.Dispose();
         }
 
         // ---------- Bearbeiten ----------
@@ -710,6 +719,65 @@ namespace NovaNote
             v.FocusEditor();
         }
 
+        void CodeFormat_Click(object sender, RoutedEventArgs e) => FormatCode();
+
+        async void FormatCode()
+        {
+            var v = ActiveView;
+            if (v == null) return;
+            if (!v.FormatSupported)
+            {
+                Dispatcher.Invoke(new Action(() => MessageBox.Show(
+                    "Code-Formatierung ist nur für Python und C# verfügbar.", "Code formatieren",
+                    MessageBoxButton.OK, MessageBoxImage.Information)));
+                return;
+            }
+
+            string err = null;
+            Exception ex = null;
+            try
+            {
+                err = await v.FormatCodeAsync();
+            }
+            catch (Exception caught)
+            {
+                ex = caught;
+            }
+
+            Dispatcher.Invoke(new Action(() =>
+            {
+                if (err != null)
+                {
+                    MessageBox.Show("Formatfehler:\n" + err, "Code formatieren",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                if (ex != null)
+                {
+                    MessageBox.Show("Formatfehler:\n" + ex.Message, "Code formatieren",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                UpdateStatus();
+                v.FocusEditor();
+            }));
+        }
+
+        void PythonCompletion_Click(object sender, RoutedEventArgs e) => PythonCompletion();
+
+        async void PythonCompletion()
+        {
+            var v = ActiveView;
+            if (v == null || !v.PythonLspReady) return;
+            try
+            {
+                await v.ShowPythonCompletionAsync();
+            }
+            catch
+            {
+            }
+        }
+
         // ---------- Ansicht ----------
 
         void TabDetach_Click(object sender, RoutedEventArgs e) => DetachActive();
@@ -849,6 +917,8 @@ namespace NovaNote
             Bind(Commands.Detach, Key.D, ModifierKeys.Control | ModifierKeys.Shift, (s, e) => DetachActive());
             Bind(Commands.CloseAll, Key.W, ModifierKeys.Control | ModifierKeys.Shift, (s, e) => CloseAllTabs());
             Bind(Commands.FormatJson, Key.J, ModifierKeys.Control | ModifierKeys.Shift, (s, e) => JsonFormat());
+            Bind(Commands.FormatCode, Key.F, ModifierKeys.Control | ModifierKeys.Shift, (s, e) => FormatCode());
+            Bind(Commands.PythonCompletion, Key.Space, ModifierKeys.Control, (s, e) => PythonCompletion());
             Bind(Commands.NextSyntaxError, Key.F4, ModifierKeys.None, (s, e) => NextSyntaxError());
         }
 
@@ -967,7 +1037,7 @@ namespace NovaNote
                 .FirstOrDefault(w => w.FindTab(view) != null);
             if (source == null || source == this) return;
             var tab = source.FindTab(view);
-            source.RemoveTab(tab);
+            source.RemoveTab(tab, false);
             if (source.Tabs.Count == 0) source.AddView(source.NewView());
             int dropIndex = GetDropIndex(e);
             view.TransferOut();
@@ -1117,6 +1187,8 @@ namespace NovaNote
         public static readonly RoutedCommand Detach = new();
         public static readonly RoutedCommand CloseAll = new();
         public static readonly RoutedCommand FormatJson = new();
+        public static readonly RoutedCommand FormatCode = new();
+        public static readonly RoutedCommand PythonCompletion = new();
         public static readonly RoutedCommand NextSyntaxError = new();
     }
 }
