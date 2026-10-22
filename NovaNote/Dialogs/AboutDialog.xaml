@@ -1,0 +1,24 @@
+<Window x:Class="NovaNote.AboutDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource DialogWindow}"
+        Title="Über NovaNote (WPF)" Width="400">
+    <Grid Margin="20" MinWidth="360">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="NovaNote (WPF)" FontSize="20" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextBrush}"/>
+        <TextBlock Grid.Row="1" x:Name="VersionText" Margin="0,6,0,0"
+                   Foreground="{DynamicResource SubtleTextBrush}"/>
+        <TextBlock Grid.Row="2" Margin="0,12,0,0" TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextBrush}"
+                   Text="Ein NovaNote im Windows-11-Design: Dark, Hell und System, Kodierung (UTF-8, UTF-8 mit BOM, UTF-16 LE/BE, ANSI), Zeilenenden (CRLF, LF, CR), Suchen, Ersetzen, Gehe zu Zeile, Schriftart, Zoom, Statusleiste und Drucken mit Seiteneinrichtung."/>
+        <Button Grid.Row="3" Style="{StaticResource BtnAccent}" Content="OK" MinWidth="84"
+                HorizontalAlignment="Right" Margin="0,18,0,0" IsDefault="True" IsCancel="True"/>
+    </Grid>
+</Window>

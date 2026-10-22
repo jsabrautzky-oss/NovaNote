@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<SyntaxDefinition name="JSON" extensions=".json;.jsonc;.json5"
+                  xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+    <!-- Die foreground-Werte sind Platzhalter; das Theme überschreibt sie pro Sprachfarbe. -->
+    <Color name="Comment" foreground="#008000" exampleText="// comment" />
+    <Color name="Key" foreground="#0451A5" exampleText="&quot;name&quot;:" />
+    <Color name="String" foreground="#A31515" exampleText="&quot;text&quot;" />
+    <Color name="Number" foreground="#098658" exampleText="3.14" />
+    <Color name="Bool" foreground="#0000FF" exampleText="true | false" />
+    <Color name="Null" foreground="#0000FF" exampleText="null" />
+    <Color name="Punctuation" foreground="#000000" exampleText="{ } [ ] : ," />
+
+    <RuleSet name="StringBody">
+        <Span begin="\\" end="." />
+    </RuleSet>
+
+    <RuleSet name="ObjectBody">
+        <Span color="Key" ruleSet="StringBody">
+            <Begin>"</Begin>
+            <End>"</End>
+        </Span>
+        <Span color="Key" ruleSet="StringBody">
+            <Begin>'</Begin>
+            <End>'</End>
+        </Span>
+        <Span color="Punctuation" ruleSet="Expression" multiline="true">
+            <Begin>:</Begin>
+            <End>(?=[,}\]])</End>
+        </Span>
+        <Rule color="Punctuation">[,]</Rule>
+    </RuleSet>
+
+    <RuleSet name="ArrayBody">
+        <Import ruleSet="Expression" />
+        <Rule color="Punctuation">[,]</Rule>
+    </RuleSet>
+
+    <RuleSet name="Expression">
+        <Span color="Comment" multiline="true">
+            <Begin>/\*</Begin>
+            <End>\*/</End>
+        </Span>
+        <Rule color="Comment">//.*</Rule>
+        <Keywords color="Bool">
+            <Word>true</Word>
+            <Word>false</Word>
+        </Keywords>
+        <Keywords color="Null">
+            <Word>null</Word>
+        </Keywords>
+        <Span color="String" ruleSet="StringBody">
+            <Begin>"</Begin>
+            <End>"</End>
+        </Span>
+        <Span color="String" ruleSet="StringBody">
+            <Begin>'</Begin>
+            <End>'</End>
+        </Span>
+        <Span color="Punctuation" ruleSet="ObjectBody" multiline="true">
+            <Begin>\{</Begin>
+            <End>\}</End>
+        </Span>
+        <Span color="Punctuation" ruleSet="ArrayBody" multiline="true">
+            <Begin>\[</Begin>
+            <End>\]</End>
+        </Span>
+        <Rule color="Number">[-+]?\b(?:0[xX][0-9a-fA-F]+|(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?)\b</Rule>
+    </RuleSet>
+
+    <RuleSet>
+        <Import ruleSet="Expression" />
+    </RuleSet>
+
+</SyntaxDefinition>

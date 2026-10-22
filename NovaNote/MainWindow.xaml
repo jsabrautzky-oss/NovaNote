@@ -1,0 +1,183 @@
+<Window x:Class="NovaNote.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:NovaNote"
+        Title="Unbenannt - NovaNote"
+        Width="900" Height="640" MinWidth="420" MinHeight="260"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12"
+        Background="{DynamicResource AppBgBrush}" Foreground="{DynamicResource TextBrush}"
+        AllowDrop="True"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewDragOver="Window_PreviewDragOver" PreviewDrop="Window_PreviewDrop">
+    <Window.Resources>
+        <DataTemplate x:Key="TabContentTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Title}" ToolTip="{Binding Tip}"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="10,0,2,0"/>
+                <Button Grid.Column="1" Style="{StaticResource TabCloseButton}" Content="&#xE8BB;"
+                        Command="{x:Static local:Commands.CloseTab}" CommandParameter="{Binding}"
+                        ToolTip="Tab schließen" Margin="0,0,6,0"/>
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Menu Grid.Row="0" x:Name="MainMenu">
+            <MenuItem Header="Datei">
+                <MenuItem x:Name="FileNewTabItem" Header="Neuer Tab" InputGestureText="Strg+T" Click="NewTab_Click"/>
+                <MenuItem x:Name="FileOpenItem" Header="Öffnen…" InputGestureText="Strg+O" Click="OpenTab_Click"/>
+                <Separator/>
+                <MenuItem x:Name="FileSaveItem" Header="Speichern" InputGestureText="Strg+S" Click="FileSave_Click"/>
+                <MenuItem x:Name="FileSaveAsItem" Header="Speichern unter…" InputGestureText="Strg+Umschalt+S" Click="FileSaveAs_Click"/>
+                <Separator/>
+                <MenuItem x:Name="FilePageSetupItem" Header="Seiteneinrichtung…" Click="PageSetup_Click"/>
+                <MenuItem x:Name="FilePrintItem" Header="Drucken…" InputGestureText="Strg+P" Click="Print_Click"/>
+                <Separator/>
+                <MenuItem x:Name="TabCloseItem" Header="Tab schließen" InputGestureText="Strg+W" Click="TabClose_Click"/>
+                <MenuItem x:Name="TabRestoreItem" Header="Zuletzt geschlossenen Tab öffnen" InputGestureText="Strg+Umschalt+T" IsEnabled="False" Click="TabRestore_Click"/>
+                <MenuItem x:Name="TabCloseAllItem" Header="Alle Tabs schließen" InputGestureText="Strg+Umschalt+W" Click="TabCloseAll_Click"/>
+                <Separator/>
+                <MenuItem x:Name="FileExitItem" Header="Beenden" InputGestureText="Alt+F4" Click="FileExit_Click"/>
+            </MenuItem>
+
+            <MenuItem Header="Bearbeiten">
+                <MenuItem x:Name="EditUndoItem" Header="Rückgängig" InputGestureText="Strg+Z" Click="EditUndo_Click"/>
+                <MenuItem x:Name="EditRedoItem" Header="Wiederholen" InputGestureText="Strg+Y" Click="EditRedo_Click"/>
+                <Separator/>
+                <MenuItem x:Name="EditCutItem" Header="Ausschneiden" InputGestureText="Strg+X" Click="EditCut_Click"/>
+                <MenuItem x:Name="EditCopyItem" Header="Kopieren" InputGestureText="Strg+C" Click="EditCopy_Click"/>
+                <MenuItem x:Name="EditPasteItem" Header="Einfügen" InputGestureText="Strg+V" Click="EditPaste_Click"/>
+                <MenuItem x:Name="EditDeleteItem" Header="Löschen" InputGestureText="Entf" Click="EditDelete_Click"/>
+                <Separator/>
+                <MenuItem x:Name="EditFindItem" Header="Suchen…" InputGestureText="Strg+F" Click="EditFind_Click"/>
+                <MenuItem x:Name="EditFindNextItem" Header="Weitersuchen" InputGestureText="F3" Click="EditFindNext_Click"/>
+                <MenuItem x:Name="EditFindPrevItem" Header="Rückwärtssuchen" InputGestureText="Umschalt+F3" Click="EditFindPrev_Click"/>
+                <MenuItem x:Name="EditReplaceItem" Header="Ersetzen…" InputGestureText="Strg+H" Click="EditReplace_Click"/>
+                <MenuItem x:Name="EditGotoItem" Header="Gehe zu Zeile…" InputGestureText="Strg+G" Click="EditGoto_Click"/>
+                <Separator/>
+                <MenuItem x:Name="EditSelectAllItem" Header="Alles markieren" InputGestureText="Strg+A" Click="EditSelectAll_Click"/>
+                <MenuItem x:Name="EditDateTimeItem" Header="Uhrzeit und Datum" InputGestureText="F5" Click="EditDateTime_Click"/>
+            </MenuItem>
+
+            <MenuItem Header="Format">
+                <MenuItem x:Name="FormatWrapItem" Header="Zeilenumbruch" IsChecked="True" IsCheckable="True" Click="FormatWrap_Click"/>
+                <MenuItem x:Name="FormatFontItem" Header="Schriftart…" Click="FormatFont_Click"/>
+                <Separator/>
+                <MenuItem Header="Kodierung">
+                    <MenuItem x:Name="EncUtf8Item" Header="UTF-8" IsCheckable="True" IsChecked="True" Click="Encoding_Click" Tag="Utf8"/>
+                    <MenuItem x:Name="EncUtf8BomItem" Header="UTF-8 mit BOM" IsCheckable="True" Click="Encoding_Click" Tag="Utf8Bom"/>
+                    <MenuItem x:Name="EncUtf16LeItem" Header="UTF-16 LE" IsCheckable="True" Click="Encoding_Click" Tag="Utf16Le"/>
+                    <MenuItem x:Name="EncUtf16BeItem" Header="UTF-16 BE" IsCheckable="True" Click="Encoding_Click" Tag="Utf16Be"/>
+                    <MenuItem x:Name="EncAnsiItem" Header="ANSI" IsCheckable="True" Click="Encoding_Click" Tag="Ansi"/>
+                </MenuItem>
+                <MenuItem Header="Zeilenenden">
+                    <MenuItem x:Name="EolCrLfItem" Header="Windows (CRLF)" IsCheckable="True" IsChecked="True" Click="Eol_Click" Tag="CrLf"/>
+                    <MenuItem x:Name="EolLfItem" Header="Unix (LF)" IsCheckable="True" Click="Eol_Click" Tag="Lf"/>
+                    <MenuItem x:Name="EolCrItem" Header="Macintosh (CR)" IsCheckable="True" Click="Eol_Click" Tag="Cr"/>
+                </MenuItem>
+            </MenuItem>
+
+            <MenuItem Header="Ansicht">
+                <MenuItem x:Name="TabDetachItem" Header="Tab in neues Fenster verschieben" InputGestureText="Strg+Umschalt+D" Click="TabDetach_Click"/>
+                <MenuItem Header="Tabs">
+                    <MenuItem x:Name="TabModeItem" Header="Multi-Tab-Modus" IsCheckable="True" IsChecked="True" Click="TabMode_Click"/>
+                    <MenuItem x:Name="SessionRestoreItem" Header="Tabs beim Start wiederherstellen" IsCheckable="True" IsChecked="True" Click="SessionRestore_Click"/>
+                </MenuItem>
+                <Separator/>
+                <MenuItem x:Name="ViewZoomInItem" Header="Vergrößern" InputGestureText="Strg+Plus" Click="ZoomIn_Click"/>
+                <MenuItem x:Name="ViewZoomOutItem" Header="Verkleinern" InputGestureText="Strg+Minus" Click="ZoomOut_Click"/>
+                <MenuItem x:Name="ViewZoomResetItem" Header="Standardgröße" InputGestureText="Strg+0" Click="ZoomReset_Click"/>
+                <Separator/>
+                <MenuItem x:Name="ViewStatusBarItem" Header="Statusleiste" IsChecked="True" IsCheckable="True" Click="StatusBar_Click"/>
+                <MenuItem x:Name="ViewLineNumbersItem" Header="Zeilennummern" IsCheckable="True" IsChecked="True" Click="ViewLineNumbers_Click"/>
+                <MenuItem x:Name="ViewWhitespaceItem" Header="Whitespace anzeigen" IsCheckable="True" IsChecked="True" Click="ViewWhitespace_Click"/>
+                <MenuItem x:Name="SyntaxCheckItem" Header="Syntax-Check" IsCheckable="True" IsChecked="True" Click="SyntaxCheck_Click"/>
+                <MenuItem x:Name="FoldingItem" Header="Code-Folding" IsCheckable="True" IsChecked="True" Click="Folding_Click"/>
+                <MenuItem x:Name="SyntaxNextItem" Header="Nächster Syntaxfehler" InputGestureText="F4" IsEnabled="False" Click="SyntaxNext_Click"/>
+                <Separator/>
+                <MenuItem Header="Farbschema">
+                    <MenuItem x:Name="ThemeLightItem" Header="Hell" IsCheckable="True" Click="Theme_Click" Tag="hell"/>
+                    <MenuItem x:Name="ThemeDarkItem" Header="Dunkel" IsCheckable="True" Click="Theme_Click" Tag="dunkel"/>
+                    <MenuItem x:Name="ThemeSystemItem" Header="System" IsCheckable="True" IsChecked="True" Click="Theme_Click" Tag="system"/>
+                </MenuItem>
+                <Separator/>
+                <MenuItem Header="Sprachen">
+                    <MenuItem x:Name="LangAutoItem" Header="Automatisch erkennen" IsCheckable="True" IsChecked="True" Click="LangAuto_Click"/>
+                    <Separator/>
+                    <MenuItem x:Name="LangJsonFormatItem" Header="JSON formatieren" InputGestureText="Strg+Umschalt+J" Click="LangJsonFormat_Click"/>
+                    <Separator/>
+                    <MenuItem x:Name="LangNoneItem" Header="Keine" IsCheckable="True" Click="Language_Click" Tag="None"/>
+                    <MenuItem x:Name="LangJsonItem" Header="JSON" IsCheckable="True" Click="Language_Click" Tag="Json"/>
+                    <MenuItem x:Name="LangXmlItem" Header="XML" IsCheckable="True" Click="Language_Click" Tag="Xml"/>
+                    <MenuItem x:Name="LangHtmlItem" Header="HTML" IsCheckable="True" Click="Language_Click" Tag="Html"/>
+                    <MenuItem x:Name="LangCssItem" Header="CSS" IsCheckable="True" Click="Language_Click" Tag="Css"/>
+                    <MenuItem x:Name="LangJsItem" Header="JavaScript" IsCheckable="True" Click="Language_Click" Tag="JavaScript"/>
+                    <MenuItem x:Name="LangCppItem" Header="C++" IsCheckable="True" Click="Language_Click" Tag="Cpp"/>
+                </MenuItem>
+            </MenuItem>
+
+            <MenuItem Header="Hilfe">
+                <MenuItem x:Name="HelpAboutItem" Header="Über NovaNote (WPF)" Click="HelpAbout_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <Grid Grid.Row="1" x:Name="TabStripRow" Background="{DynamicResource AppBgBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ListBox Grid.Column="0" x:Name="TabStrip" Style="{StaticResource TabListStyle}"
+                     ItemTemplate="{StaticResource TabContentTemplate}"
+                     ItemContainerStyle="{StaticResource TabItemStyle}"
+                     AllowDrop="True" DragOver="TabStrip_DragOver" Drop="TabStrip_Drop"
+                     PreviewMouseLeftButtonDown="TabStrip_Down" PreviewMouseMove="TabStrip_Move"
+                     SelectionChanged="TabStrip_SelectionChanged"/>
+            <Button Grid.Column="1" x:Name="PlusTabButton" Style="{StaticResource PlusTabButton}"
+                    Content="&#xE710;" ToolTip="Neuer Tab" Click="NewTab_Click"/>
+            <Border Grid.Column="0" Grid.ColumnSpan="2" Height="1" VerticalAlignment="Bottom"
+                    Background="{DynamicResource DividerBrush}"/>
+        </Grid>
+
+        <ContentControl Grid.Row="2" x:Name="EditorHost" Focusable="False"/>
+
+        <Border Grid.Row="3" Background="{DynamicResource AppBgBrush}" Padding="12,6"
+                BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0">
+            <Grid x:Name="StatusBarGrid">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusCaret" Grid.Column="0" Text="Zeile 1, Spalte 1"
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="6,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusSelection" Grid.Column="1" Text=""
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="6,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusSyntax" Grid.Column="2" Text=""
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="6,0" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" MaxWidth="420"/>
+                <TextBlock x:Name="StatusLanguage" Grid.Column="3" Text="Automatisch" HorizontalAlignment="Right"
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusEncoding" Grid.Column="4" Text="UTF-8"
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusEol" Grid.Column="5" Text="Windows (CRLF)"
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusZoom" Grid.Column="6" Text="100 %"
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,28 @@
+<Window x:Class="NovaNote.GoToDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource DialogWindow}"
+        Title="Gehe zu Zeile" Width="300">
+    <Grid Margin="16" MinWidth="268">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Label Grid.Row="0" Grid.Column="0" Content="Zeile:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+        <TextBox Grid.Row="0" Grid.Column="1" x:Name="LineBox" Padding="6,4" MinHeight="26"
+                 VerticalContentAlignment="Center" KeyDown="LineBox_KeyDown"/>
+
+        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Style="{StaticResource BtnAccent}" Content="OK" MinWidth="84"
+                    IsDefault="True" Click="Ok_Click"/>
+            <Button Style="{StaticResource Btn}" Content="Abbrechen" MinWidth="84"
+                    Margin="8,0,0,0" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
