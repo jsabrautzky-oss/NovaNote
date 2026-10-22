@@ -171,6 +171,7 @@ namespace NovaNote
                     FoldingMargin.SetFoldingMarkerBackgroundBrush(fm, markerBg);
                 }
             }
+            TintMarkdownPreview();
         }
 
         static Brush FrozenBrush(Brush source, Color fallback)
@@ -179,6 +180,55 @@ namespace NovaNote
             var brush = new SolidColorBrush(color);
             brush.Freeze();
             return brush;
+        }
+
+        void TintMarkdownPreview()
+        {
+            var doc = MarkdownViewer?.Document;
+            if (doc == null) return;
+            bool dark = ThemeService.IsDark;
+            var text = AppBrush("TextBrush") ?? (dark ? Brushes.White : Brushes.Black);
+            var accent = AppBrush("AccentBrush") ?? Brushes.DodgerBlue;
+
+            foreach (var block in doc.Blocks)
+            {
+                if (block is Paragraph p)
+                {
+                    TintMarkdownForeground(p, dark, text);
+                    foreach (var inline in p.Inlines)
+                        TintMarkdownInline(inline, dark, text, accent);
+                }
+                else
+                {
+                    block.SetValue(TextElement.ForegroundProperty, text);
+                }
+            }
+        }
+
+        void TintMarkdownForeground(DependencyObject element, bool dark, Brush text)
+        {
+            var current = element.GetValue(TextElement.ForegroundProperty) as SolidColorBrush;
+            if (current == null || current.Color == Colors.Transparent) return;
+            double lum = 0.2126 * current.Color.R + 0.7152 * current.Color.G + 0.0722 * current.Color.B;
+            if (dark ? lum < 120 : lum > 150)
+                element.SetValue(TextElement.ForegroundProperty, text);
+        }
+
+        void TintMarkdownInline(Inline inline, bool dark, Brush text, Brush accent)
+        {
+            if (inline is Hyperlink link)
+            {
+                link.SetValue(TextElement.ForegroundProperty, accent);
+                foreach (var inner in link.Inlines)
+                    TintMarkdownInline(inner, dark, text, accent);
+                return;
+            }
+
+            TintMarkdownForeground(inline, dark, text);
+
+            if (inline is Span span)
+                foreach (var inner in span.Inlines)
+                    TintMarkdownInline(inner, dark, text, accent);
         }
 
         public void ApplyPreferences()
@@ -682,6 +732,7 @@ namespace NovaNote
             try
             {
                 MarkdownViewer.Markdown = Editor.Text;
+                TintMarkdownPreview();
             }
             catch
             {
