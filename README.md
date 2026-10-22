@@ -1,9 +1,17 @@
 # NovaNote
 
-NovaNote ist ein leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs und Syntax-Check. Aktuell als öffentliche Beta `0.2.0-beta` auf GitHub verfügbar.
+**Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-GitHub Release:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.2.0-beta
+Aktuelle Version: **0.5.0**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.5.0
+
+## Neu in 0.5.0
+- **KI-Assistent im rechten Chat-Panel** (optional, standardmäßig geschlossen): Antworten, Suche, Zusammenfassung und Editor-Aktionen
+- **Tool-Calls**: NovaNote führt Editor-Werkzeuge aus (`get_document`, `search_document`, `goto_line`, `select_lines`, `replace_all_text`, `replace_lines`, `insert_at_line`, `syntax_check`, `format_code`); Änderungen erst auf „Übernehmen“ oder automatisch
+- **Anbieter-Verwaltung** mit Auto-Scan: Modelle, Kontextgröße, Vision und Tool-Support; Adresse und API-Key frei editierbar, API-Key per DPAPI verschlüsselt
+- **Text-Fallback** für Modelle ohne native Tools (```nova```-Block)
+- **Codeübernahme** aus Antwort-Codeblöcken, Multi-Turn-Chat, Abbrechen, Panel-Breite bleibt erhalten
+- Dialog- und ComboBox-Fixes: Auswahl wird im geschlossenen Feld sichtbar, keine überlappenden Zeilen im KI-Einstellungsdialog
 
 ## Was kann NovaNote?
 - Dateien bearbeiten: `.txt`, `.md`, `.markdown`, `.py`, `.pyw`, `.cs`, `.csx`, `.yaml`, `.yml`, `.json`, `.jsonc`, `.json5`, `.xml`, `.xsl`, `.xhtml`, `.svg`, `.html`, `.htm`, `.css`, `.js`, `.mjs`, `.ts`, `.cpp`, `.c`, `.h`, `.hpp`
@@ -19,6 +27,25 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.2.0-beta
 - Drucken mit Seiteneinrichtung
 - Themes: Hell, Dunkel, System
 - Drag & Drop von Dateien
+- Optional: lokaler KI-Assistent (siehe unten)
+
+## Optionale lokale KI
+Ohne KI nutzt NovaNote nur den Editor — das Panel ist zu, es laufen keine Anfragen.
+
+1. Server starten, z. B. LM Studio (`http://localhost:1234/v1`), Ollama (`http://localhost:11434/v1`) oder
+   `llama-server` auf einem anderen Rechner (z. B. `http://192.168.178.81:8081/v1`). Die Adresse ist frei editierbar.
+2. NovaNote: Menü „KI → KI-Einstellungen…“ → Anbieter auswählen, Adresse prüfen, dann „Modelle scannen“.
+3. Panel öffnen über „KI → KI-Panel“ oder `Strg+Alt+K`; aktives Modell und Anbieter stehen als Dropdown im Panel.
+   Die Breite bleibt nach dem Zerren am Trenner gespeichert.
+4. Der Chat schickt den aktuellen Dokumenttext als Kontext mit. Das Modell antwortet in Text oder ruft Werkzeuge auf.
+5. Editor-Aktionen werden standardmäßig erst nach „Übernehmen“ ausgeführt; „KI → Aktionen automatisch anwenden“
+   führt sie sofort aus. `Strg+Z` macht übernommene Änderungen rückgängig.
+6. Modelle ohne native Tool-Aufrufe nutzen ein Text-Format (```nova```-Block), das NovaNote ebenfalls ausführt.
+7. Der API-Key wird verschlüsselt (DPAPI, aktueller Benutzer) in `%APPDATA%\NovaNote\ki.json` gespeichert.
+8. Manche Server (z. B. `llama-server`) melden Tool-Support nicht in `/v1/models`. NovaNote versucht Tool-Aufrufe trotzdem
+   und setzt das „Tools“-Flag im Panel automatisch, sobald ein Aufruf akzeptiert wurde.
+
+Die KI ist rein optional: ohne laufenden Server passiert nichts, NovaNote bleibt ein lokaler Editor.
 
 ## Unterstützte Sprachen
 | Sprache | Syntax-Highlighting | Syntax-Check | Code-Folding | Hinweis |
@@ -45,10 +72,11 @@ Hinweis: Weitere Sprachen sollen später folgen.
 - Dateiendungen `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` werden nach dem Installer-Setup mit NovaNote verknüpft
 - Große Dateien bleiben nutzbar durch Limits für Syntax-Check/Folding
 - Portable-Version ohne Registry-Einträge möglich
+- KI läuft lokal, keine Cloud-Dienste nötig
 
 ## Installationsoptionen
 1. **Velopack-Installer**  
-    Empfohlen für normale Nutzung. Installiert NovaNote für den aktuellen Benutzer, erstellt Shortcuts und verknüpft `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` mit NovaNote. Andere Dateien öffnest du über „Öffnen…“ oder per Kommandozeile.
+   Empfohlen für normale Nutzung. Installiert NovaNote für den aktuellen Benutzer, erstellt Shortcuts und verknüpft `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` mit NovaNote. Andere Dateien öffnest du über „Öffnen…“ oder per Kommandozeile.
 2. **Portable-Zip**  
    Ohne Installation: ZIP entpacken und `NovaNote.exe` starten. Keine Registry-Einträge durch den Installer.
 3. **Direkter Start mit Datei**  
@@ -61,7 +89,7 @@ Hinweis: Weitere Sprachen sollen später folgen.
 4. Optional: `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` per Doppelklick mit NovaNote öffnen.
 
 Direkter Installer-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.2.0-beta/NovaNote-win-Setup.exe
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.0/NovaNote-win-Setup.exe
 
 ## Installation als Portable-Version
 1. `NovaNote-win-Portable.zip` von der GitHub-Release-Seite herunterladen.
@@ -69,7 +97,7 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.2.0-beta/NovaNo
 3. `NovaNote.exe` starten.
 
 Direkter Portable-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.2.0-beta/NovaNote-win-Portable.zip
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.0/NovaNote-win-Portable.zip
 
 ## Updates
 - NovaNote kann beim Start automatisch prüfen, ob auf GitHub ein neuer Release mit `NovaNote-win-Setup.exe` vorhanden ist.
@@ -79,10 +107,11 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.2.0-beta/NovaNo
 
 ## Voraussetzungen
 - 64-bit Windows 10 oder Windows 11
-- Internetzugang für Download und spätere Updates
+- Internetzugang für Download und spätere Updates (nicht für die lokale KI)
 - Genügend Speicherplatz für die App und entpackte Portable-Version
 - Kein Administrator für die Benutzer-Installation nötig
 - Kein separate .NET-Installation nötig
+- Für die KI: ein lokaler OpenAI-kompatibler Server (LM Studio, Ollama oder `llama-server`)
 
 ## Systeme
 NovaNote läuft für:

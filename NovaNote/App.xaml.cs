@@ -16,6 +16,7 @@ namespace NovaNote
 
             Codec.Name(NovaNoteEncoding.Utf8);
             SessionStore.LoadPrefs();
+            AiStore.Load();
             ThemeService.SetMode(SessionStore.Prefs.Theme);
 
             var args = StartupArgs.ToList();

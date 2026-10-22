@@ -1,12 +1,12 @@
 # NovaNote — interne Architektur-Landkarte
 
 Repo: https://github.com/jsabrautzky-oss/NovaNote  
-Aktuelle Beta: 0.2.0-beta  
+Aktuelle Version: 0.5.0  
 
 Diese Datei ist nur für interne Coding-/KI-Agenten gedacht und nicht für öffentliche Nutzerdoku. Sie soll Scannen des ganzen Codes vermeiden. Alles Wichtige ist hier zusammengefasst: Komponenten, Abhängigkeiten, öffentliche APIs, Fluss, Fallstricke.
 
 ## Zweck
-WPF-Editor „NovaNote“ für Windows (.NET 9) mit AvalonEdit-Editor, Syntax-Highlighting, Syntax-Check mit roter Wellenlinie, Code-Folding, Markdown-Live-Vorschau für `.md/.markdown`, Python-LSP/Live-Check/Completion/Formatierung, C#-Roslyn-Check/Formatierung, YAML-Check/Indent-Folding, Mehrfach-Tabs, Session-Wiederherstellung, Theme (hell/dunkel/system), Drucken, Suchen/Ersetzen, Goto, Encoding/EOL-Umschaltung, Drag & Drop, Tab-Detach, Velopack-Installer und verknüpfte Dateiendungen `.txt/.md/.markdown/.json/.xml/.html` (ProgID `NovaNote.Editor`, nur HKCU).
+WPF-Editor „NovaNote“ für Windows (.NET 9) mit AvalonEdit-Editor, Syntax-Highlighting, Syntax-Check mit roter Wellenlinie, Code-Folding, Markdown-Live-Vorschau für `.md/.markdown`, Python-LSP/Live-Check/Completion/Formatierung, C#-Roslyn-Check/Formatierung, YAML-Check/Indent-Folding, Mehrfach-Tabs, Session-Wiederherstellung, Theme (hell/dunkel/system), Drucken, Suchen/Ersetzen, Goto, Encoding/EOL-Umschaltung, Drag & Drop, Tab-Detach, Velopack-Installer und verknüpfte Dateiendungen `.txt/.md/.markdown/.json/.xml/.html` (ProgID `NovaNote.Editor`, nur HKCU). Optional lokaler KI-Assistent im rechten Chat-Panel gegen OpenAI-kompatible Server (LM Studio/Ollama/`llama-server`) mit Tool-Calls auf den Editor; ohne Server keine KI.
 
 ## Build / Installer
 ```powershell
@@ -26,13 +26,13 @@ Das Script erzeugt:
 
 GitHub-Release erzeugen und hochladen (nach `gh auth login` oder mit `GH_TOKEN`):
 ```powershell
-powershell .\release.ps1 -version 0.2.0-beta -repo jsabrautzky-oss/NovaNote -tag v0.2.0-beta -title "NovaNote 0.2.0-beta" -prerelease $true
+powershell .\release.ps1 -version 0.5.0 -repo jsabrautzky-oss/NovaNote -tag v0.5.0 -title "NovaNote 0.5.0" -prerelease $false
 ```
 
 Wichtige Velopack-Parameter:
 - `packId`: `NovaNote`
 - `mainExe`: `NovaNote.exe`
-- `packVersion`: `1.0.0`
+- `packVersion`: `0.5.0`
 - `icon`: `NovaNote\novanote.ico`
 - `runtime`: `win-x64`
 
@@ -59,9 +59,9 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`. Python-LS
 |---|---|---|
 | `NovaNote.csproj` | `net9.0-windows`, `UseWPF`, `WinExe`, `StartupObject=NovaNote.Program`, Packages, embedded `Highlighting/Json.xshd`, `Highlighting/Markdown.xshd` und `Highlighting/Yaml.xshd` | Assembly/RootNamespace `NovaNote` |
 | `Program.cs` | echter Einstiegspunkt, Velopack zuerst, dann WPF `App.Run()` | setzt `App.StartupArgs`, ruft `VelopackApp.Build().SetAppUserModelId(FileAssociationHelper.ProgId).SetArgs(args).Run()` |
-| `App.xaml` / `App.xaml.cs` | merged Dicts `Theme/Light.xaml` + `Theme/Controls.xaml`, Argumente `/?`, `/N`, `/S`, Dateipfad, Session-Windows | nutzt `App.StartupArgs`, ruft `SessionStore.LoadPrefs()`, `ThemeService.SetMode()`, erstellt `MainWindow` |
-| `MainWindow.xaml(.cs)` | Fenster, Tab-UI, Menü, Statusbar, RoutedCommands+KeyBindings, Dialogsteuerung, Session speichern | besitzt `ObservableCollection<TabModel> Tabs`, `ActiveView`; verwendet `DocumentView`, Dialoge, `ThemeService`, `SessionStore`, `Codec`; `View_ContextAction` aktiviert den Tab und leitet `DocAction` an die bestehenden Handlers weiter |
-| `DocumentView.xaml(.cs)` | zentrale Editor-Komponente (UserControl mit `ae:TextEditor x:Name="Editor"` und `md:MarkdownScrollViewer x:Name="MarkdownViewer"`) | AvalonEdit-Dokument, Highlighting, Markdown-Preview, Python-LSP/Completion/Diagnostics, C#-/YAML-Format/Folding, Syntax-Check, Undo, Encoding/EOL, Search, Print, Session-Restore, Dispose von Timern/LSP, Rechtsklick-Menü `EditorMenuPopup`; Events `StateChanged`, `DirtyChanged`, `ContextAction(DocumentView, DocAction, bool)` |
+| `App.xaml` / `App.xaml.cs` | merged Dicts `Theme/Light.xaml` + `Theme/Controls.xaml`, Argumente `/?`, `/N`, `/S`, Dateipfad, Session-Windows | nutzt `App.StartupArgs`, ruft `SessionStore.LoadPrefs()`, `AiStore.Load()`, `ThemeService.SetMode()`, erstellt `MainWindow` |
+| `MainWindow.xaml(.cs)` | Fenster, Tab-UI, Menü, Statusbar, RoutedCommands+KeyBindings, Dialogsteuerung, Session speichern, KI-Panel | besitzt `ObservableCollection<TabModel> Tabs`, `ActiveView`; verwendet `DocumentView`, Dialoge, `ThemeService`, `SessionStore`, `Codec`, `AiStore`/`LocalAiClient`/`AiTools`; `RootGrid` hat drei Spalten (Editor, `AiSplitter`, `AiPanel`), `ApplyAiPanel(open)` setzt `Prefs.AiPanelOpen` und `Prefs.AiPanelWidth`, `AiSplitter_DragCompleted` speichert die Breite; KI-Region: `RefreshAiPanel`, `AiDetectAsync`, `AiSendAsync`/`AiRunAsync` (Agent-Loop max 6), Pending-Call/Code, `Commands.AiToggle` = `Strg+Alt+K` |
+| `DocumentView.xaml(.cs)` | zentrale Editor-Komponente (UserControl mit `ae:TextEditor x:Name="Editor"` und `md:MarkdownScrollViewer x:Name="MarkdownViewer"`) | AvalonEdit-Dokument, Highlighting, Markdown-Preview, Python-LSP/Completion/Diagnostics, C#-/YAML-Format/Folding, Syntax-Check, Undo, Encoding/EOL, Search, Print, Session-Restore, Dispose von Timern/LSP, Rechtsklick-Menü `EditorMenuPopup`; Events `StateChanged`, `DirtyChanged`, `ContextAction(DocumentView, DocAction, bool)`; KI-API: `CurrentText`, `GetLines`, `FindAll`, `ReplaceAllText`, `ReplaceLines`, `InsertLine`, `SelectLines`, `GoToLineQuiet`, `SelectedText`, `SyntaxHasErrors`, `FormatSupported` (kein `ReplaceText` für KI — verwirft Undo) |
 | `FileAssociationHelper.cs` | HKCU-Dateizuordnungen, ProgID, Velopack-Fluent-Adapter | ProgID `NovaNote.Editor`, Description `NovaNote Editor`, Endungen `.txt/.md/.markdown/.py/.pyw/.cs/.yaml/.yml/.json/.xml/.html`; `WithFirstRun/WithAfterUpdate/WithBeforeUninstall` |
 | `Highlight.cs` | `DocLanguage` (None/Json/Xml/Html/Css/JavaScript/Cpp/Markdown/Python/CSharp/Yaml), `DocLanguages.FromExtension/DetectContent/DisplayName` | wird von DocumentView/MainWindow/Syntax/Folding verwendet; `.md/.markdown` → Markdown, `.py/.pyw` → Python, `.cs/.csx` → CSharp, `.yaml/.yml` → Yaml; Enum nur am Ende anhängen, damit Session-Language-Ints kompatibel bleiben |
 | `Codec.cs` | Encoding/EOL: `NovaNoteEncoding`, `LineEnding`, Detect/Decode/Encode/NormalizeToLf/ApplyEol | registriert CodePages-Provider; von DocumentView/Statusbar/session genutzt |
@@ -78,11 +78,14 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`. Python-LS
 | `PythonLanguageServerClient.cs` | eigener Python-LSP-Client | stdio JSON-RPC mit `Content-Length`, `initialize/initialized/didOpen/didChange/completion/hover/publishDiagnostics/textDocument/diagnostic`; `didOpen.text` und `didChange.version` gehören in `textDocument`; Params-Key muss `params` sein; Dispose killt Prozess |
 | `IndentFoldingStrategy.cs` | YAML-Folding | `UpdateFoldings(manager, document)`, `CreateFoldings(document, maxFoldings)` mit `NewFolding { StartOffset, EndOffset, Name }`, sortiert nach StartOffset; nutzt `document.GetText(offset,length)` |
 | `Theme/Light.xaml`, `Theme/Dark.xaml` | Theme-Farb-Brushes | u. a. `EditorBgBrush`, `TextBrush`, `SubtleTextBrush`, `SelectionBrush`, `Syntax*Brush`, `SyntaxErrorBrush` |
-| `Theme/Controls.xaml` | Control-Styles für WPF-Controls | global gemerged |
+| `Theme/Controls.xaml` | Control-Styles für WPF-Controls | global gemerged; `ToggleBtn`, `CbItem`, ComboBox-Template bindet Auswahl im geschlossenen Feld über `SelectedItem` + `ItemTemplate`, `PasswordBox`-Style |
 | `Theme/ThemeService.cs` | hell/dunkel/system, DWM-Titelleiste, `ThemeChanged` | ersetzt gemergte Theme-Dictionary in `Application.Current.Resources.MergedDictionaries` |
 | `UpdateService.cs` | GitHub Update-Check und Setup-Download | `Program.Main` läuft zuerst; App ruft `UpdateService.StartStartupCheck(window)`; Manual über `AboutDialog`/`MainWindow`; Setup wird silent mit `App.StartupArgs` gestartet |
-| `SessionStore.cs` | `AppPrefs`, `SessionState`, JSON in `%APPDATA%\NovaNote\einstellungen.json` und `sitzung.json` | Prefs: RestoreSession, MultiTab, LanguageAuto, ShowLineNumbers, ShowWhitespace, SyntaxCheck, Folding, Theme, UpdateCheck, DismissedUpdateVersion |
-| `Dialogs/*.xaml(.cs)` | Suche/Ersetzen, Goto, Schriftwahl, About, PageSetup | `SearchDialog`/`GoToDialog` haben `MainWindow`-Referenz und rufen Such/Goto-API |
+| `SessionStore.cs` | `AppPrefs`, `SessionState`, JSON in `%APPDATA%\NovaNote\einstellungen.json` und `sitzung.json` | Prefs: RestoreSession, MultiTab, LanguageAuto, ShowLineNumbers, ShowWhitespace, SyntaxCheck, Folding, Theme, UpdateCheck, DismissedUpdateVersion, AiPanelOpen, AiPanelWidth (180–720, aus GridSplitter), AiAutoApply |
+| `Dialogs/*.xaml(.cs)` | Suche/Ersetzen, Goto, Schriftwahl, About, PageSetup, KI-Einstellungen | `SearchDialog`/`GoToDialog` haben `MainWindow`-Referenz und rufen Such/Goto-API; `AiSettingsDialog` editiert Anbieter/Adresse/API-Key und Modell-Scan und ruft `AiStore.ReplaceState` |
+| `AiStore.cs` | KI-Anbieter/Modelle in `%APPDATA%\NovaNote\ki.json` | `AiKind`, `AiProvider` (API-Key DPAPI via `ProtectedData`, `[JsonIgnore] auf ApiKey/DisplayName/ActiveModel`), `AiModel`, `AiState`, `Load/Save`, `MergeScanned`, `NewId`, `SetActiveProvider`, Presets LM Studio/Ollama |
+| `LocalAiClient.cs` | HTTP-Client für OpenAI-kompatible Server | `ScanAsync` (`/v1/models`, `/api/v1/models`, `/api/tags`+`/api/show`), `ChatAsync` mit `tools`/`tool_choice`, Retry ohne Tools bei Ablehnung, `ParseFallbackToolCalls` (```nova```), `ExtractCodeBlock`, `NormalizeBase`/`OpenAiBase`/`RootBase`; Kontext-Keys `contextWindow`/`context_length`/`n_ctx`, Vision via `multimodal`/`vision` |
+| `AiTools.cs` | 9 Tool-Schemas + Dispatcher auf `DocumentView` | `Execute(name, argsJson, view)`, `IsEditTool`, `ShortArgs`; Edits erzeugen eine Undo-Group |
 | `app.manifest`, `novanote.ico` | DPI/Manifest, Icon | Icon für EXE, Installer und Explorer-DefaultIcon |
 | `installer.ps1` | Publish + `vpk pack` zu Velopack-Installer | erzeugt `publish/` und `Releases/` |
 | `Releases/` | Velopack-Pakete, nicht Build-Input | enthält z. B. `NovaNote-win-Setup.exe` |
@@ -140,8 +143,15 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`. Python-LS
 - statische globale Zustände: `BaseFamily/BaseStyle/BaseWeight/BaseSize`, `LastPrinterName`, `MargL/T/R/B`, `ClosedHistory`
 - Tab/Datei: `NewView()`, `FindTab(view)`, `OpenInNewTab(path)`, `CloseTab(tab)`
 - Suche/Dialoge: `DoSearch`, `ReplaceCurrent`, `ReplaceAll`, `ShowSearch(bool)`, `ShowGoTo()`, `GoToLine(int)`, `SaveSearchArgs`, `SetPrintMargins`
-- `Commands` mit Bindings: Ctrl+T/O/S/Shift+S/P/F/F3/Shift+F3/Ctrl+H/Ctrl+G/F5/Zoom/Shift+W/Ctrl+Shift+T/Ctrl+Tab/Ctrl+Shift+Tab/Ctrl+Shift+D/Ctrl+Shift+W/`Ctrl+Shift+J` JSON-Format/`Ctrl+Shift+F` Code-Format (Python/C#)/`Ctrl+Space` Python-Completion/`F4` nächster Syntaxfehler.
+- `Commands` mit Bindings: Ctrl+T/O/S/Shift+S/P/F/F3/Shift+F3/Ctrl+H/Ctrl+G/F5/Zoom/Shift+W/Ctrl+Shift+T/Ctrl+Tab/Ctrl+Shift+Tab/Ctrl+Shift+D/Ctrl+Shift+W/`Ctrl+Shift+J` JSON-Format/`Ctrl+Shift+F` Code-Format (Python/C#)/`Ctrl+Space` Python-Completion/`F4` nächster Syntaxfehler/`Ctrl+Alt+K` KI-Panel.
 - Menü „Sprachen“ enthält Markdown, Python, C#, YAML sowie `CodeFormatItem` (Python/C#) und `PythonCompletionItem` (nur wenn Python-LSP ready).
+- Menü „KI“ enthält `AiPanelItem` (checkable), `AiAutoApplyItem` (checkable), `AiScanItem`, `AiSettingsItem`; Panel-Header nutzt `AiProviderBox`/`AiModelBox` (ComboBoxen), `AiStatus`, `AiLog`, `AiInput`, `AiSendButton`/`AiCancelButton`/`AiApplyButton`/`AiDiscardButton`/`AiClearButton`.
+
+### KI
+- `AiStore`: `Load()`, `Save()`, `State` (`Providers`, `ActiveProviderId`), `ActiveProvider`, `SetActiveProvider(id)`, `MergeScanned(provider, models)`, `NewId(prefix)`, `KindLabel/KindFromLabel`, `ReplaceState(list, activeId)`; `AiProvider.ApiKey` (de)kodiert DPAPI in `ApiKeyEnc`; `AiModel.DisplayName/Context/Vision/Tools` für UI
+- `LocalAiClient`: `ScanAsync(provider, ct)`, `ChatAsync(provider, model, messages, tools, ct)` → `AiReply { Content, ToolCalls, ToolsAccepted, Error }`; `ExtractCodeBlock`, `ParseFallbackToolCalls`; Base-URL-Normalisierung; HTTP-Retry ohne `tools` wenn der Server Tools ablehnt
+- `AiTools`: `Execute(string name, string argsJson, DocumentView view)` → String-Ergebnis; `IsEditTool(name)`; 9 Tools; Edit-Tools rufen `ReplaceAllText`/`ReplaceLines`/`InsertLine` (eine Undo-Group)
+- `AiSettingsDialog`: `AiStore.ReplaceState` bei OK, `SessionStore.Prefs.AiAutoApply`; `DialogWindow`-Style hat `SizeToContent=WidthAndHeight`
 
 ### `SessionStore`
 - `AppPrefs` (siehe oben), `LoadPrefs()`, `SavePrefs()`, `HasSession`, `LoadSession()`, `SaveSession(SessionState)`, `ClearSession()`
@@ -197,6 +207,10 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`. Python-LS
 23. **Python-LSP/CLI und Dispatcher**: Python-LSP startet async; wenn der LSP nicht ready ist, nutzt `RunSyntaxCheck` den Python-CLI-Fallback. `ReplaceFormatted` und Python-Completion marshalieren UI-Arbeit über `Dispatcher.Invoke`, damit Formatierung/Completion auch ohne UI-SynchronizationContext (temp-Harness) keine Thread-Zugriffsfehler erzeugt. UI-Handler wie `MainWindow.FormatCode()` marshalieren MessageBox/UpdateStatus nach `await` ebenfalls über Dispatcher.
 24. **Farbwerte sind AARRGGBB**: `Color`-Keys in `Theme/*.xaml` nutzen 8-stellig `#AARRGGBB`. `#005FB859` (Light) war Alpha `00` → Selection unsichtbar; richtig ist `#59005FB8` (Light) und `#594CC2FF` (Dark). Beim Ändern von Selection-/Popup-Farben Alpha zuerst prüfen.
 25. **Popup-Stil**: Das Rechtsklick-Menü ist ein eigenes `Popup` mit `Border Background="{DynamicResource PopupBgBrush}"`; `Theme/Controls.xaml` hat implicit Styles für `Menu`/`MenuItem` (Hover = `PopupHoverBrush`). Kein eigener `ContextMenu`-Template-Style: ein solches Template öffnet den WPF-Popup nicht (Popup bleibt `IsOpen=false`) und würde zusätzlich die TextBox-Kontextmenüs in Dialogen zerstören. Farb-Alpha ist 8-stellig als `#AARRGGBB` zu lesen.
+26. **ComboBox ist kein ContentControl**: Der eigene ComboBox-Style muss die Auswahl im geschlossenen Feld über `Content={Binding SelectedItem, RelativeSource TemplatedParent}` + `ContentTemplate={TemplateBinding ItemTemplate}` anzeigen; ein nackter `ContentPresenter` bleibt leer. Der `CbItem`-Accent-Hintergrund darf nur im Popup erscheinen.
+27. **KI-Editorzugriff**: Nur die dokumentierte `DocumentView`-KI-API nutzen (`ReplaceAllText`, `ReplaceLines`, `InsertLine`, `GetLines`, `FindAll`, `SelectLines`, `GoToLineQuiet`); `ReplaceText` verwirft den Undo-Stack und ist für KI-Aktionen ungeeignet.
+28. **KI ist optional**: Ohne Server laufen keine Anfragen (`AiDetectAsync` zeigt nur „Kein Server erreichbar“). `AiStore.Save()` schreibt `%APPDATA%\NovaNote\ki.json` (DPAPI-Key, nur aktueller Benutzer); Harness-Tests dürfen echte `ki.json`/`einstellungen.json` nicht überschreiben, ohne sie vorher zu sichern.
+29. **`llama-server` meldet Tools nicht**: `/v1/models` liefert oft kein Tool-Support-Flag; `MainWindow.AiRunAsync` setzt `model.SupportsTools = true` und speichert, nachdem ein Tool-Aufruf akzeptiert wurde. Kontext steht dort als `contextWindow`/`context_length`, Vision als `multimodal`/`modalities`.
 
 ## Kurzregeln für KI
 - Nicht den ganzen Code scannen; diese README als Landkarte nutzen.

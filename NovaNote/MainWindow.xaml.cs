@@ -4,6 +4,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -41,6 +44,16 @@ namespace NovaNote
         Point? _dragStart;
         TabModel _dragTab;
         bool _closingForUpdate;
+
+        bool _aiApplying;
+        bool _aiSyncing;
+        bool _aiBusy;
+        CancellationTokenSource _aiCts;
+        readonly List<AiMessage> _aiMessages = new List<AiMessage>();
+        AiToolCall _aiPendingCall;
+        string _aiPendingCode;
+        int _aiPendingRound;
+        AiSettingsDialog _aiDlg;
 
         public TabModel Active => _active;
         public DocumentView ActiveView => _active?.View;
@@ -101,6 +114,10 @@ namespace NovaNote
             UpdateTabWidths();
             UpdateTitle();
             UpdateStatus();
+
+            AiStore.Changed += OnAiStoreChanged;
+            Closed += (s, e) => AiStore.Changed -= OnAiStoreChanged;
+            ApplyAiPanel(SessionStore.Prefs.AiPanelOpen);
 
             _autosave = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
             _autosave.Tick += (s, e) =>
@@ -454,6 +471,11 @@ namespace NovaNote
             FoldingItem.IsChecked = SessionStore.Prefs.Folding;
             SyntaxNextItem.IsEnabled = ActiveView?.HasSyntaxErrors == true;
             UpdateAutoItem.IsChecked = SessionStore.Prefs.UpdateCheck;
+            _aiApplying = true;
+            AiPanelItem.IsChecked = AiPanel.Visibility == Visibility.Visible;
+            AiToggle.IsChecked = AiPanel.Visibility == Visibility.Visible;
+            AiAutoApplyItem.IsChecked = SessionStore.Prefs.AiAutoApply;
+            _aiApplying = false;
             UpdateEncodingChecks();
             UpdateEolChecks();
             UpdateLanguageChecks();
@@ -937,6 +959,471 @@ namespace NovaNote
             ActiveView?.FocusEditor();
         }
 
+        // ---------- KI ----------
+
+        void ToggleAiPanel() => ApplyAiPanel(AiPanel.Visibility != Visibility.Visible);
+
+        void ApplyAiPanel(bool open)
+        {
+            _aiApplying = true;
+            SessionStore.Prefs.AiPanelOpen = open;
+            SessionStore.SavePrefs();
+            AiPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            AiSplitter.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            RootGrid.ColumnDefinitions[1].Width = open ? GridLength.Auto : new GridLength(0);
+            RootGrid.ColumnDefinitions[2].Width = open ? new GridLength(ClampAiWidth(SessionStore.Prefs.AiPanelWidth)) : new GridLength(0);
+            AiPanelItem.IsChecked = open;
+            AiToggle.IsChecked = open;
+            _aiApplying = false;
+
+            if (open)
+            {
+                RefreshAiPanel();
+                AiInput.Focus();
+                _ = AiDetectAsync();
+            }
+            else
+            {
+                ActiveView?.FocusEditor();
+            }
+        }
+
+        double ClampAiWidth(double w)
+        {
+            if (w < 180) return 180;
+            if (w > 720) return 720;
+            return Math.Round(w);
+        }
+
+        void AiSplitter_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+        {
+            if (!AiSplitter.IsVisible) return;
+            SessionStore.Prefs.AiPanelWidth = ClampAiWidth(RootGrid.ColumnDefinitions[2].ActualWidth);
+            SessionStore.SavePrefs();
+        }
+
+        void AiToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_aiApplying) return;
+            ApplyAiPanel(true);
+        }
+
+        void AiToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_aiApplying) return;
+            ApplyAiPanel(false);
+        }
+
+        void AiPanel_Click(object sender, RoutedEventArgs e)
+        {
+            if (_aiApplying) return;
+            ApplyAiPanel(AiPanelItem.IsChecked);
+        }
+
+        void AiAutoApply_Click(object sender, RoutedEventArgs e)
+        {
+            SessionStore.Prefs.AiAutoApply = AiAutoApplyItem.IsChecked;
+            SessionStore.SavePrefs();
+            ActiveView?.FocusEditor();
+        }
+
+        void OnAiStoreChanged()
+        {
+            Dispatcher.BeginInvoke(new Action(() => RefreshAiPanel()));
+        }
+
+        void RefreshAiPanel()
+        {
+            if (AiProviderBox == null) return;
+            var provider = AiStore.ActiveProvider;
+            var selectedModel = provider?.ActiveModel;
+
+            _aiSyncing = true;
+            AiProviderBox.ItemsSource = AiStore.State.Providers;
+            AiProviderBox.SelectedItem = provider;
+            AiModelBox.ItemsSource = provider?.Models ?? new List<AiModel>();
+            AiModelBox.SelectedItem = provider?.Models.FirstOrDefault(m =>
+                selectedModel != null && string.Equals(m.Id, selectedModel.Id, StringComparison.OrdinalIgnoreCase));
+            _aiSyncing = false;
+
+            UpdateAiStatus();
+        }
+
+        void AiProviderBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_aiSyncing) return;
+            if (AiProviderBox.SelectedItem is AiProvider provider) AiStore.SetActiveProvider(provider);
+            RefreshAiPanel();
+        }
+
+        void AiModelBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_aiSyncing) return;
+            var provider = AiStore.ActiveProvider;
+            if (provider != null && AiModelBox.SelectedItem is AiModel model)
+                AiStore.SetActiveModel(provider, model.Id);
+            UpdateAiStatus();
+        }
+
+        void UpdateAiStatus()
+        {
+            var provider = AiStore.ActiveProvider;
+            var model = provider?.ActiveModel;
+            if (provider == null)
+            {
+                AiStatus.Text = "KI: kein Anbieter erfasst";
+                AiStatus.ToolTip = "KI → KI-Einstellungen…";
+                return;
+            }
+            if (model == null)
+            {
+                AiStatus.Text = $"KI: {provider.Name} · kein Modell · KI → Modelle scannen";
+                AiStatus.ToolTip = provider.BaseUrl;
+                return;
+            }
+            AiStatus.Text = $"KI: {provider.Name} · {model.DisplayName} · Kontext {model.ContextLength} · " +
+                            $"Vision {(model.Vision ? "Ja" : "Nein")} · Tools {(model.SupportsTools ? "Ja" : "Nein")}";
+            AiStatus.ToolTip = $"{provider.BaseUrl} · Modell-ID {model.Id}";
+        }
+
+        async Task AiDetectAsync()
+        {
+            var provider = AiStore.ActiveProvider;
+            if (provider == null)
+            {
+                AiStatus.Text = "KI: kein Anbieter erfasst";
+                return;
+            }
+
+            AiStatus.Text = $"KI: verbinde {provider.Name}…";
+            var result = await LocalAiClient.ScanAsync(provider, CancellationToken.None);
+            if (result.Error != null)
+            {
+                AiStatus.Text = "KI: " + result.Error;
+                return;
+            }
+
+            AiStore.MergeScanned(provider, result.Models);
+            AiStore.Save();
+            RefreshAiPanel();
+        }
+
+        async void AiScan_Click(object sender, RoutedEventArgs e)
+        {
+            var provider = AiStore.ActiveProvider;
+            if (provider == null)
+            {
+                AppendAi("Kein Anbieter erfasst. KI → KI-Einstellungen…");
+                return;
+            }
+
+            AiScanItem.IsEnabled = false;
+            AiStatus.Text = $"KI: scanne {provider.Name}…";
+            var result = await LocalAiClient.ScanAsync(provider, CancellationToken.None);
+            AiScanItem.IsEnabled = true;
+
+            if (result.Error != null)
+            {
+                AppendAi("Scan: " + result.Error);
+                AiStatus.Text = "KI: " + result.Error;
+                return;
+            }
+
+            int added = AiStore.MergeScanned(provider, result.Models);
+            AiStore.Save();
+            RefreshAiPanel();
+            AppendAi($"Scan: {result.Models.Count} Modelle bei {provider.Name}, {added} neue. " +
+                     $"Aktives Modell: {provider.ActiveModel?.DisplayName ?? "keins"}.");
+            ActiveView?.FocusEditor();
+        }
+
+        void AiSettings_Click(object sender, RoutedEventArgs e)
+        {
+            if (_aiDlg == null)
+            {
+                _aiDlg = new AiSettingsDialog { Owner = this };
+                _aiDlg.Closed += (s, ev) => _aiDlg = null;
+                _aiDlg.ShowDialog();
+                RefreshAiPanel();
+            }
+            ActiveView?.FocusEditor();
+        }
+
+        void AppendAi(string text)
+        {
+            if (AiLog == null) return;
+            AiLog.AppendText(AiLog.Text.Length > 0 ? "\n" + text : text);
+            AiLog.ScrollToEnd();
+        }
+
+        int AiContextBudget(AiModel model)
+        {
+            int context = model?.ContextLength ?? 4096;
+            return Math.Clamp((int)(context * 1.4f), 1500, 8000);
+        }
+
+        string BuildAiSystemPrompt(AiModel model)
+        {
+            var view = ActiveView;
+            string code = view?.CurrentText ?? "";
+            int budget = AiContextBudget(model);
+            bool cut = code.Length > budget;
+            if (cut) code = code.Substring(0, budget);
+
+            var sb = new StringBuilder();
+            sb.Append("Du bist der KI-Assistent für NovaNote. Der aktuelle Code des Nutzers lautet:\n");
+            sb.Append("```\n").Append(code).Append("\n```\n");
+            if (cut && view != null) sb.Append($"(gekürzt, das Dokument hat {view.LineCount} Zeilen)\n");
+            sb.Append("Wenn du Code änderst oder generierst, antworte AUSSCHLIESSLICH im gültigen Format und ");
+            sb.Append("umschließe den Code mit dreifachen Backticks (```).\n");
+            sb.Append("Entscheide selbst: reine Fragen (Zusammenfassung, Erklärung, Suche nach einer Zeile) ");
+            sb.Append("beantwortest du als Text ohne Codeblock; Änderungen am Editor machst du über Tools.\n");
+            sb.Append($"Werkzeuge: {string.Join(", ", AiTools.Names)}. Der vollständige Text steht schon oben; ");
+            sb.Append("nutze get_document nur für Ausschnitte.\n");
+            sb.Append("Nach einer Änderung prüfst du syntax_check und korrigierst Fehler, wenn du sie siehst.\n");
+            return sb.ToString();
+        }
+
+        void TrimAiTranscript()
+        {
+            var system = _aiMessages.FirstOrDefault(m => m.Role == "system");
+            var rest = _aiMessages.Where(m => m.Role != "system").ToList();
+            const int keep = 12;
+            if (rest.Count > keep) rest = rest.Skip(rest.Count - keep).ToList();
+            while (rest.Count > 0 && rest[0].Role == "tool") rest.RemoveAt(0);
+            _aiMessages.Clear();
+            if (system != null) _aiMessages.Add(system);
+            _aiMessages.AddRange(rest);
+        }
+
+        void SetAiBusy(bool busy)
+        {
+            _aiBusy = busy;
+            AiSendButton.IsEnabled = !busy;
+            AiCancelButton.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+            AiScanItem.IsEnabled = !busy;
+            if (busy) AiStatus.Text = "KI: denkt…";
+        }
+
+        void ShowAiPending(bool show)
+        {
+            AiApplyButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            AiDiscardButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            AiApplyButton.Content = _aiPendingCall != null ? "Aktion anwenden" : "Code übernehmen";
+        }
+
+        async void AiSend_Click(object sender, RoutedEventArgs e) => await AiSendAsync();
+
+        async Task AiSendAsync()
+        {
+            if (_aiBusy) return;
+            string prompt = AiInput.Text.Trim();
+            if (string.IsNullOrEmpty(prompt)) return;
+
+            var provider = AiStore.ActiveProvider;
+            var model = provider?.ActiveModel;
+            if (provider == null || model == null)
+            {
+                AppendAi("Kein Anbieter oder Modell gewählt. KI → KI-Einstellungen…");
+                return;
+            }
+
+            AppendAi("Du: " + prompt);
+            AiInput.Clear();
+            _aiPendingCall = null;
+            _aiPendingCode = null;
+            ShowAiPending(false);
+
+            TrimAiTranscript();
+            _aiMessages.RemoveAll(m => m.Role == "system");
+            _aiMessages.Insert(0, new AiMessage { Role = "system", Content = BuildAiSystemPrompt(model) });
+            _aiMessages.Add(new AiMessage { Role = "user", Content = prompt });
+
+            _aiCts = new CancellationTokenSource();
+            await AiRunAsync(0);
+        }
+
+        async Task AiRunAsync(int startRound)
+        {
+            var provider = AiStore.ActiveProvider;
+            var model = provider?.ActiveModel;
+            if (provider == null || model == null)
+            {
+                AppendAi("Kein Anbieter oder Modell gewählt. KI → KI-Einstellungen…");
+                return;
+            }
+
+            SetAiBusy(true);
+            try
+            {
+                for (int round = startRound; round < 6; round++)
+                {
+                    var reply = await LocalAiClient.ChatAsync(
+                        provider, model, _aiMessages, AiTools.Definitions(), _aiCts.Token);
+
+                    if (reply.Error != null)
+                    {
+                        AppendAi("Fehler: " + reply.Error);
+                        break;
+                    }
+
+                    if (reply.ToolsAccepted && reply.ToolCalls.Count > 0 && !model.SupportsTools)
+                    {
+                        model.SupportsTools = true;
+                        AiStore.Save();
+                    }
+
+                    if (reply.ToolCalls.Count > 0)
+                    {
+                        _aiMessages.Add(new AiMessage
+                        {
+                            Role = "assistant",
+                            Content = reply.Content,
+                            ToolCalls = reply.ToolCalls
+                        });
+
+                        foreach (var call in reply.ToolCalls)
+                        {
+                            AppendAi($"→ Tool: {call.Name} ({AiTools.ShortArgs(call.Arguments)})");
+
+                            if (AiTools.IsEditTool(call.Name) && !SessionStore.Prefs.AiAutoApply)
+                            {
+                                _aiPendingCall = call;
+                                _aiPendingRound = round + 1;
+                                ShowAiPending(true);
+                                AppendAi("Editor-Aktion wartet auf Bestätigung: „Übernehmen“ klicken.");
+                                SetAiBusy(false);
+                                AiInput.Focus();
+                                return;
+                            }
+
+                            var result = await AiTools.Execute(call.Name, call.Arguments, ActiveView);
+                            AppendAi("← " + result);
+                            _aiMessages.Add(new AiMessage
+                            {
+                                Role = "tool",
+                                ToolCallId = call.Id,
+                                Content = result
+                            });
+                        }
+
+                        TrimAiTranscript();
+                        continue;
+                    }
+
+                    string content = reply.Content ?? "";
+                    if (string.IsNullOrWhiteSpace(content))
+                    {
+                        AppendAi("KI: (leere Antwort)");
+                        break;
+                    }
+
+                    AppendAi("KI: " + content);
+                    _aiMessages.Add(new AiMessage { Role = "assistant", Content = content });
+
+                    var code = LocalAiClient.ExtractCodeBlock(content);
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        _aiPendingCode = code;
+                        ShowAiPending(true);
+                        AppendAi("Code-Block gefunden: „Code übernehmen“ klicken.");
+                    }
+
+                    TrimAiTranscript();
+                    break;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                AppendAi("Abgebrochen.");
+            }
+            finally
+            {
+                SetAiBusy(false);
+                UpdateAiStatus();
+                AiInput.Focus();
+            }
+        }
+
+        async void AiApply_Click(object sender, RoutedEventArgs e)
+        {
+            var view = ActiveView;
+            if (view == null) return;
+
+            if (_aiPendingCall != null)
+            {
+                var call = _aiPendingCall;
+                _aiPendingCall = null;
+                ShowAiPending(false);
+
+                var result = await AiTools.Execute(call.Name, call.Arguments, view);
+                AppendAi("← " + result);
+                _aiMessages.Add(new AiMessage { Role = "tool", ToolCallId = call.Id, Content = result });
+                TrimAiTranscript();
+
+                _aiCts = new CancellationTokenSource();
+                await AiRunAsync(_aiPendingRound);
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(_aiPendingCode))
+            {
+                view.ReplaceAllText(_aiPendingCode);
+                _aiPendingCode = null;
+                AppendAi("Code in Editor übernommen (Strg+Z macht es rückgängig).");
+                UpdateStatus();
+            }
+
+            ShowAiPending(false);
+            AiInput.Focus();
+        }
+
+        void AiDiscard_Click(object sender, RoutedEventArgs e)
+        {
+            if (_aiPendingCall != null)
+            {
+                _aiMessages.Add(new AiMessage
+                {
+                    Role = "tool",
+                    ToolCallId = _aiPendingCall.Id,
+                    Content = "Aktion vom Nutzer abgelehnt."
+                });
+                _aiPendingCall = null;
+            }
+            _aiPendingCode = null;
+            ShowAiPending(false);
+            TrimAiTranscript();
+            AppendAi("Aktion verworfen.");
+            AiInput.Focus();
+        }
+
+        void AiCancel_Click(object sender, RoutedEventArgs e) => _aiCts?.Cancel();
+
+        void AiClear_Click(object sender, RoutedEventArgs e)
+        {
+            _aiMessages.Clear();
+            _aiPendingCall = null;
+            _aiPendingCode = null;
+            ShowAiPending(false);
+            AiLog.Clear();
+            AiInput.Focus();
+        }
+
+        void AiInput_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Return)
+            {
+                if (Keyboard.Modifiers == ModifierKeys.Shift) return;
+                e.Handled = true;
+                _ = AiSendAsync();
+            }
+            else if (e.Key == Key.Escape && _aiBusy)
+            {
+                e.Handled = true;
+                _aiCts?.Cancel();
+            }
+        }
+
         // ---------- Tastatur / Binding ----------
 
         void SetupBindings()
@@ -968,6 +1455,7 @@ namespace NovaNote
             Bind(Commands.FormatCode, Key.F, ModifierKeys.Control | ModifierKeys.Shift, (s, e) => FormatCode());
             Bind(Commands.PythonCompletion, Key.Space, ModifierKeys.Control, (s, e) => PythonCompletion());
             Bind(Commands.NextSyntaxError, Key.F4, ModifierKeys.None, (s, e) => NextSyntaxError());
+            Bind(Commands.AiToggle, Key.K, ModifierKeys.Control | ModifierKeys.Alt, (s, e) => ToggleAiPanel());
         }
 
         void Bind(RoutedCommand cmd, Key key, ModifierKeys mod, ExecutedRoutedEventHandler handler)
@@ -978,6 +1466,10 @@ namespace NovaNote
 
         void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            bool inAiInput = AiInput != null && Keyboard.FocusedElement == AiInput;
+            if (inAiInput && Keyboard.Modifiers == ModifierKeys.Control && (e.Key == Key.Z || e.Key == Key.Y)) return;
+            if (inAiInput && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.Z) return;
+
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Z)
             {
                 ActiveView?.DoUndo();
@@ -1238,5 +1730,6 @@ namespace NovaNote
         public static readonly RoutedCommand FormatCode = new();
         public static readonly RoutedCommand PythonCompletion = new();
         public static readonly RoutedCommand NextSyntaxError = new();
+        public static readonly RoutedCommand AiToggle = new();
     }
 }

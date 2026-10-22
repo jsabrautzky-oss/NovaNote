@@ -1,0 +1,166 @@
+<Window x:Class="NovaNote.AiSettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource DialogWindow}"
+        Title="KI-Einstellungen" Width="780" Height="600"
+        ResizeMode="CanResizeWithGrip">
+    <Grid Margin="16" MinWidth="720" MinHeight="520">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Label Grid.Row="0" Grid.Column="0" Content="Anbieter:" Margin="0,0,0,4"/>
+        <ListBox Grid.Row="1" Grid.Column="0" x:Name="ProviderList" MinHeight="140"
+                 SelectionChanged="ProviderList_SelectionChanged" Margin="0,0,14,0">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Name}" ToolTip="{Binding BaseUrl}" TextTrimming="CharacterEllipsis"/>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Margin="0,10,14,0">
+            <Button Style="{StaticResource Btn}" Content="Neu" MinWidth="72" Click="NewProvider_Click"/>
+            <Button Style="{StaticResource Btn}" Content="Löschen" MinWidth="72" Margin="6,0,0,0"
+                    Click="DeleteProvider_Click"/>
+        </StackPanel>
+
+        <Grid Grid.Row="0" Grid.RowSpan="2" Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Label Grid.Row="0" Grid.Column="0" Content="Anbietername:" Margin="0,0,8,2"/>
+            <Label Grid.Row="0" Grid.Column="1" Content="Anbieter-Typ:" Margin="0,0,0,2"/>
+
+            <TextBox Grid.Row="1" Grid.Column="0" x:Name="NameBox" Padding="6,4" MinHeight="26"
+                     VerticalContentAlignment="Center" Margin="0,0,8,0" TextChanged="NameBox_TextChanged"/>
+            <ComboBox Grid.Row="1" Grid.Column="1" x:Name="KindBox" SelectionChanged="KindBox_SelectionChanged"/>
+
+            <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Content="OpenAI-Adresse (Basis-URL):" Margin="0,10,0,2"/>
+            <TextBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" x:Name="UrlBox" Padding="6,4" MinHeight="26"
+                     VerticalContentAlignment="Center" TextChanged="UrlBox_TextChanged"/>
+
+            <Label Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Content="API-Key (optional):" Margin="0,10,0,2"/>
+            <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <PasswordBox Grid.Column="0" x:Name="KeyBox" Padding="6,4" MinHeight="26"
+                             VerticalContentAlignment="Center" PasswordChanged="KeyBox_PasswordChanged"/>
+                <TextBox Grid.Column="0" x:Name="KeyTextBox" Padding="6,4" MinHeight="26" Visibility="Collapsed"
+                         VerticalContentAlignment="Center" TextChanged="KeyTextBox_TextChanged"/>
+                <CheckBox Grid.Column="1" x:Name="ShowKeyBox" Content="Anzeigen" Margin="10,0,0,0"
+                          VerticalAlignment="Center" Checked="ShowKey_Changed" Unchecked="ShowKey_Changed"/>
+            </Grid>
+
+            <Label Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Content="Modelle:" Margin="0,12,0,2"/>
+            <Grid Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.1*"/>
+                    <ColumnDefinition Width="1.3*"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="52"/>
+                    <ColumnDefinition Width="52"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Name" Foreground="{DynamicResource SubtleTextBrush}"/>
+                <TextBlock Grid.Column="1" Text="Modell-ID" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}"/>
+                <TextBlock Grid.Column="2" Text="Kontext" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}"/>
+                <TextBlock Grid.Column="3" Text="Vision" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}"/>
+                <TextBlock Grid.Column="4" Text="Tools" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}"/>
+            </Grid>
+            <ListBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2" x:Name="ModelList" MinHeight="150"
+                     SelectionChanged="ModelList_SelectionChanged">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.1*"/>
+                                <ColumnDefinition Width="1.3*"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="52"/>
+                                <ColumnDefinition Width="52"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Id}" Margin="8,0,0,0"
+                                       TextTrimming="CharacterEllipsis" Foreground="{DynamicResource SubtleTextBrush}"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Context}" Margin="8,0,0,0"/>
+                            <TextBlock Grid.Column="3" Text="{Binding Vision}" Margin="8,0,0,0"/>
+                            <TextBlock Grid.Column="4" Text="{Binding Tools}" Margin="8,0,0,0"/>
+                        </Grid>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Active}" Value="True">
+                                <Setter Property="TextElement.FontWeight" Value="SemiBold"/>
+                                <Setter Property="TextElement.Foreground" Value="{DynamicResource AccentBrush}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Missing}" Value="True">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <StackPanel Grid.Row="9" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,10,0,0">
+                <Button Style="{StaticResource BtnAccent}" Content="Modelle scannen" MinWidth="110" Click="Scan_Click"/>
+                <Button x:Name="SetActiveButton" Style="{StaticResource Btn}" Content="Als aktives Modell"
+                        MinWidth="110" Margin="8,0,0,0" IsEnabled="False" Click="SetActive_Click"/>
+                <Button x:Name="RemoveButton" Style="{StaticResource Btn}" Content="Entfernen"
+                        MinWidth="84" Margin="8,0,0,0" IsEnabled="False" Click="Remove_Click"/>
+            </StackPanel>
+
+            <GroupBox Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2" Header="Modell manuell hinzufügen" Margin="0,10,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBox x:Name="NewIdBox" Padding="6,4" MinHeight="26" Width="150"
+                             VerticalContentAlignment="Center" ToolTip="Modell-ID, z. B. qwen2.5:7b"/>
+                    <TextBox x:Name="NewNameBox" Padding="6,4" MinHeight="26" Width="150" Margin="8,0,0,0"
+                             VerticalContentAlignment="Center" ToolTip="Anzeigename (optional)"/>
+                    <TextBox x:Name="NewContextBox" Padding="6,4" MinHeight="26" Width="80" Margin="8,0,0,0"
+                             VerticalContentAlignment="Center" ToolTip="Kontextgröße in Tokens"/>
+                    <CheckBox x:Name="NewVisionBox" Content="Vision" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                    <CheckBox x:Name="NewToolsBox" Content="Tools" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    <Button Style="{StaticResource Btn}" Content="Hinzufügen" MinWidth="90" Margin="10,0,0,0"
+                            Click="AddManual_Click"/>
+                </StackPanel>
+            </GroupBox>
+
+            <TextBlock Grid.Row="11" Grid.Column="0" Grid.ColumnSpan="2" x:Name="StatusText" Margin="0,8,0,0"
+                       TextWrapping="Wrap" Foreground="{DynamicResource SubtleTextBrush}" Text="Bereit."/>
+        </Grid>
+
+        <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <CheckBox Grid.Column="0" x:Name="AutoApplyBox" Content="Editor-Aktionen automatisch anwenden"
+                      HorizontalAlignment="Left" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Style="{StaticResource BtnAccent}" Content="OK" MinWidth="84" IsDefault="True" Click="Ok_Click"/>
+                <Button Style="{StaticResource Btn}" Content="Abbrechen" MinWidth="84" Margin="8,0,0,0" IsCancel="True"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

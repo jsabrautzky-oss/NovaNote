@@ -17,6 +17,9 @@ namespace NovaNote
         public string Theme { get; set; } = ThemeService.System;
         public bool UpdateCheck { get; set; } = true;
         public string DismissedUpdateVersion { get; set; } = null;
+        public bool AiPanelOpen { get; set; } = false;
+        public double AiPanelWidth { get; set; } = 300;
+        public bool AiAutoApply { get; set; } = false;
     }
 
     public class SessionTab

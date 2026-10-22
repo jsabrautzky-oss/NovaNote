@@ -393,6 +393,88 @@ namespace NovaNote
 
         public void FocusEditor() => Editor.Focus();
 
+        public string SelectedText => SelLength > 0 ? Doc.GetText(SelStart, SelLength) : "";
+
+        public string GetLines(int fromLine, int count)
+        {
+            int total = Math.Max(1, LineCount);
+            int from = Math.Clamp(fromLine, 1, total);
+            int to = Math.Clamp(from + Math.Max(0, count) - 1, from, total);
+            var start = Doc.GetLineByNumber(from);
+            var end = Doc.GetLineByNumber(to);
+            return Doc.GetText(start.Offset, end.Offset + end.Length - start.Offset);
+        }
+
+        public void ReplaceAllText(string text)
+        {
+            Doc.BeginUpdate();
+            try
+            {
+                Doc.Replace(0, DocLength, Norm(text ?? ""));
+            }
+            finally
+            {
+                Doc.EndUpdate();
+            }
+            Editor.CaretOffset = 0;
+            DetectLanguage();
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void ReplaceLines(int fromLine, int toLine, string text)
+        {
+            int total = Math.Max(1, LineCount);
+            int from = Math.Clamp(fromLine, 1, total);
+            int to = Math.Clamp(toLine, from, total);
+            var start = Doc.GetLineByNumber(from);
+            var end = Doc.GetLineByNumber(to);
+            ReplaceRange(start.Offset, end.Offset + end.Length - start.Offset, text);
+            Editor.CaretOffset = start.Offset;
+            ScrollToIndex(start.Offset);
+            DetectLanguage();
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void InsertLine(int line, string text)
+        {
+            int total = Math.Max(1, LineCount);
+            int at = Math.Clamp(line, 1, total + 1);
+            int offset = at > total ? DocLength : Doc.GetLineByNumber(at).Offset;
+            ReplaceRange(offset, 0, Norm(text ?? "") + "\n");
+            Editor.CaretOffset = offset;
+            ScrollToIndex(offset);
+            DetectLanguage();
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public List<(int line, int col, int length)> FindAll(string term, bool matchCase, bool whole, int max)
+        {
+            var result = new List<(int, int, int)>();
+            if (string.IsNullOrEmpty(term)) return result;
+            var opts = RegexOptions.ExplicitCapture;
+            if (!matchCase) opts |= RegexOptions.IgnoreCase;
+            string pattern = whole ? "(?<!\\w)" + Regex.Escape(term) + "(?!\\w)" : Regex.Escape(term);
+            foreach (Match m in Regex.Matches(PlainText(), pattern, opts))
+            {
+                var l = Doc.GetLineByOffset(m.Index);
+                result.Add((l.LineNumber, m.Index - l.Offset + 1, m.Length));
+                if (result.Count >= Math.Max(1, max)) break;
+            }
+            return result;
+        }
+
+        public void SelectLines(int fromLine, int toLine)
+        {
+            int total = Math.Max(1, LineCount);
+            int from = Math.Clamp(fromLine, 1, total);
+            int to = Math.Clamp(toLine, from, total);
+            var start = Doc.GetLineByNumber(from);
+            var end = Doc.GetLineByNumber(to);
+            Select(start.Offset, end.Offset + end.Length - start.Offset);
+            ScrollToIndex(start.Offset);
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         bool IsMarkdown => Lang == DocLanguage.Markdown || DocLanguages.FromExtension(Path_) == DocLanguage.Markdown;
 
         // ---------- Rechtsklick-Menü ----------
@@ -1385,6 +1467,15 @@ namespace NovaNote
             Editor.CaretOffset = offset;
             Editor.ScrollTo(n, 1);
             Editor.Focus();
+        }
+
+        public void GoToLineQuiet(int n)
+        {
+            n = Math.Clamp(n, 1, Math.Max(1, LineCount));
+            int offset = Doc.GetOffset(n, 1);
+            Editor.CaretOffset = offset;
+            Editor.ScrollTo(n, 1);
+            StateChanged?.Invoke(this, EventArgs.Empty);
         }
 
         void ScrollToIndex(int index)

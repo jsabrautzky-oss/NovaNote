@@ -24,15 +24,27 @@
             </Grid>
         </DataTemplate>
     </Window.Resources>
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <Grid x:Name="RootGrid">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="0"/>
+            <ColumnDefinition Width="0"/>
+        </Grid.ColumnDefinitions>
 
-        <Menu Grid.Row="0" x:Name="MainMenu">
+        <Grid Grid.Column="0" x:Name="MainGrid">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" x:Name="MenuBarRow">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Menu Grid.Column="0" x:Name="MainMenu">
             <MenuItem Header="Datei">
                 <MenuItem x:Name="FileNewTabItem" Header="Neuer Tab" InputGestureText="Strg+T" Click="NewTab_Click"/>
                 <MenuItem x:Name="FileOpenItem" Header="Öffnen…" InputGestureText="Strg+O" Click="OpenTab_Click"/>
@@ -132,6 +144,16 @@
                 </MenuItem>
             </MenuItem>
 
+            <MenuItem Header="KI">
+                <MenuItem x:Name="AiPanelItem" Header="KI-Panel" InputGestureText="Strg+Alt+K"
+                          IsCheckable="True" IsChecked="False" Click="AiPanel_Click"/>
+                <MenuItem x:Name="AiAutoApplyItem" Header="Aktionen automatisch anwenden"
+                          IsCheckable="True" IsChecked="False" Click="AiAutoApply_Click"/>
+                <Separator/>
+                <MenuItem x:Name="AiScanItem" Header="Modelle scannen" Click="AiScan_Click"/>
+                <MenuItem x:Name="AiSettingsItem" Header="KI-Einstellungen…" Click="AiSettings_Click"/>
+            </MenuItem>
+
             <MenuItem Header="Hilfe">
                 <MenuItem Header="Update">
                     <MenuItem x:Name="UpdateAutoItem" Header="Automatisch auf Updates prüfen"
@@ -142,9 +164,13 @@
                 <Separator/>
                 <MenuItem x:Name="HelpAboutItem" Header="Über NovaNote" Click="HelpAbout_Click"/>
             </MenuItem>
-        </Menu>
+                </Menu>
+                <ToggleButton Grid.Column="1" x:Name="AiToggle" Style="{StaticResource ToggleBtn}"
+                              Content="&#xE8BD;" ToolTip="KI-Panel (Strg+Alt+K)"
+                              Checked="AiToggle_Checked" Unchecked="AiToggle_Unchecked"/>
+            </Grid>
 
-        <Grid Grid.Row="1" x:Name="TabStripRow" Background="{DynamicResource AppBgBrush}">
+            <Grid Grid.Row="1" x:Name="TabStripRow" Background="{DynamicResource AppBgBrush}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -190,6 +216,73 @@
                            Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
                 <TextBlock x:Name="StatusZoom" Grid.Column="6" Text="100 %"
                            Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+        </Grid>
+
+        <GridSplitter Grid.Column="1" x:Name="AiSplitter" Visibility="Collapsed" Width="4"
+                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="{DynamicResource DividerBrush}" ResizeBehavior="PreviousAndNext"
+                      DragCompleted="AiSplitter_DragCompleted"/>
+
+        <Border Grid.Column="2" x:Name="AiPanel" Visibility="Collapsed" MinWidth="180" MaxWidth="720"
+                Background="{DynamicResource AppBgBrush}"
+                BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1,0,0,0">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox Grid.Column="0" x:Name="AiProviderBox" Margin="0,0,6,0" ToolTip="Anbieter"
+                              SelectionChanged="AiProviderBox_SelectionChanged">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <ComboBox Grid.Column="1" x:Name="AiModelBox" ToolTip="Modell"
+                              SelectionChanged="AiModelBox_SelectionChanged">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </Grid>
+
+                <TextBlock Grid.Row="1" x:Name="AiStatus" Margin="0,8,0,6" Text="KI bereit"
+                           Foreground="{DynamicResource SubtleTextBrush}" TextTrimming="CharacterEllipsis"/>
+
+                <TextBox Grid.Row="2" x:Name="AiLog" IsReadOnly="True" TextWrapping="Wrap" MinHeight="120"
+                         Padding="6,4" BorderThickness="1" BorderBrush="{DynamicResource DividerBrush}"
+                         Background="{DynamicResource EditorBgBrush}" VerticalScrollBarVisibility="Auto"/>
+
+                <TextBox Grid.Row="3" x:Name="AiInput" AcceptsReturn="True" TextWrapping="Wrap"
+                         Margin="0,8,0,0" Padding="6,4" MinHeight="46" MaxHeight="120"
+                         VerticalScrollBarVisibility="Auto" PreviewKeyDown="AiInput_PreviewKeyDown"/>
+
+                <WrapPanel Grid.Row="4" Margin="0,8,0,0">
+                    <Button x:Name="AiSendButton" Style="{StaticResource BtnAccent}" Content="Senden"
+                            MinWidth="90" Click="AiSend_Click"/>
+                    <Button x:Name="AiCancelButton" Style="{StaticResource Btn}" Content="Abbrechen"
+                            MinWidth="80" Margin="6,0,0,0" Visibility="Collapsed" Click="AiCancel_Click"/>
+                    <Button x:Name="AiApplyButton" Style="{StaticResource Btn}" Content="Übernehmen"
+                            MinWidth="100" Margin="6,0,0,0" Visibility="Collapsed" Click="AiApply_Click"/>
+                    <Button x:Name="AiDiscardButton" Style="{StaticResource Btn}" Content="Verwerfen"
+                            MinWidth="80" Margin="6,0,0,0" Visibility="Collapsed" Click="AiDiscard_Click"/>
+                    <Button x:Name="AiClearButton" Style="{StaticResource Btn}" Content="Verlauf löschen"
+                            MinWidth="100" Margin="6,0,0,0" Click="AiClear_Click"/>
+                </WrapPanel>
             </Grid>
         </Border>
     </Grid>
