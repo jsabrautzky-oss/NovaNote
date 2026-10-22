@@ -45,6 +45,9 @@ $assets = @(
   (Join-Path $releasesDir "assets.win.json")
 )
 
+$delta = Join-Path $releasesDir "NovaNote-$version-delta.nupkg"
+if (Test-Path $delta) { $assets += $delta }
+
 $releaseArgs = @("release", "create", $tag, "--repo", $repo, "--title", $title, "--notes", $notes)
 if ($prerelease) { $releaseArgs += "--prerelease" }
 $releaseArgs += $assets
