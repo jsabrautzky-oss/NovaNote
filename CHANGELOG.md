@@ -13,7 +13,7 @@ NovaNote 0.5.0 ist die erste Release-Version mit der optionalen lokalen KI-Anbin
 - Scan liest auch `contextWindow`/`context_length`/`n_ctx` und Vision-Marker wie `multimodal`, damit `llama-server` (auch im Netzwerk) korrekt erkannt wird
 - Das „Tools“-Flag wird automatisch auf Ja gesetzt, wenn der Server einen Tool-Aufruf akzeptiert hat (llama-server meldet das nicht in `/v1/models`)
 - Aktives Modell pro Anbieter per ComboBox im Panel; Statuszeile zeigt Anbieter, Modell, Kontext, Vision und Tools
-- Chat mit Kontext-Injektion des aktuellen Dokumenttexts (gekürzt nach Modell-Kontextgröße) und Mehrturn-Verlauf
+- Chat mit Multi-Turn-Verlauf; das Dokument wird nicht automatisch als Kontext geschickt — die KI liest bei Bedarf selbst über `get_document`/`search_document` (spart Tokens)
 - Agent-Loop mit bis zu 6 Tool-Runden und Abbrechen; Werkzeuge: `get_document`, `search_document`, `goto_line`, `select_lines`, `replace_all_text`, `replace_lines`, `insert_at_line`, `syntax_check`, `format_code`
 - Editor-Aktionen brauchen Bestätigung per „Übernehmen“ (abschaltbar über „Aktionen automatisch anwenden“); Änderungen bleiben eine Undo-Group
 - Codeblöcke aus der KI-Antwort werden per „Code übernehmen“ in den Editor geschrieben; Modelle ohne Tool-Support nutzen ein ```nova```-Textformat

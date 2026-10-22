@@ -1156,31 +1156,25 @@ namespace NovaNote
             AiLog.ScrollToEnd();
         }
 
-        int AiContextBudget(AiModel model)
-        {
-            int context = model?.ContextLength ?? 4096;
-            return Math.Clamp((int)(context * 1.4f), 1500, 8000);
-        }
-
         string BuildAiSystemPrompt(AiModel model)
         {
             var view = ActiveView;
-            string code = view?.CurrentText ?? "";
-            int budget = AiContextBudget(model);
-            bool cut = code.Length > budget;
-            if (cut) code = code.Substring(0, budget);
+            string name = string.IsNullOrEmpty(view?.Path_) ? "neu (ohne Datei)" : System.IO.Path.GetFileName(view.Path_);
+            string lang = view?.StatusLanguage ?? "Text";
+            int lines = view?.LineCount ?? 0;
+            int sel = view?.SelectedText?.Length ?? 0;
 
             var sb = new StringBuilder();
-            sb.Append("Du bist der KI-Assistent für NovaNote. Der aktuelle Code des Nutzers lautet:\n");
-            sb.Append("```\n").Append(code).Append("\n```\n");
-            if (cut && view != null) sb.Append($"(gekürzt, das Dokument hat {view.LineCount} Zeilen)\n");
-            sb.Append("Wenn du Code änderst oder generierst, antworte AUSSCHLIESSLICH im gültigen Format und ");
-            sb.Append("umschließe den Code mit dreifachen Backticks (```).\n");
-            sb.Append("Entscheide selbst: reine Fragen (Zusammenfassung, Erklärung, Suche nach einer Zeile) ");
-            sb.Append("beantwortest du als Text ohne Codeblock; Änderungen am Editor machst du über Tools.\n");
-            sb.Append($"Werkzeuge: {string.Join(", ", AiTools.Names)}. Der vollständige Text steht schon oben; ");
-            sb.Append("nutze get_document nur für Ausschnitte.\n");
-            sb.Append("Nach einer Änderung prüfst du syntax_check und korrigierst Fehler, wenn du sie siehst.\n");
+            sb.Append($"Du bist der KI-Assistent für NovaNote. Aktive Datei: {name} — {lang}, {lines} Zeilen");
+            if (sel > 0) sb.Append($", {sel} Zeichen ausgewählt");
+            sb.Append(".\n");
+            sb.Append("Der Dokumenttext wird nicht automatisch geschickt. Lies ihn bei Bedarf selbst über die Werkzeuge: ");
+            sb.Append("get_document (kompletter Text oder Ausschnitt mit from_line/count), search_document (Suchtreffer), ");
+            sb.Append("goto_line/select_lines (Navigation/Auswahl).\n");
+            sb.Append("Änderungen machst du mit replace_all_text, replace_lines oder insert_at_line und prüfst danach syntax_check.\n");
+            sb.Append("Reine Fragen beantwortest du als Text ohne Codeblock; wenn du Code erzeugst, ");
+            sb.Append("umschließe ihn mit dreifachen Backticks (```).\n");
+            sb.Append($"Werkzeuge: {string.Join(", ", AiTools.Names)}.\n");
             return sb.ToString();
         }
 

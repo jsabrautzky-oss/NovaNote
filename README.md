@@ -7,7 +7,7 @@ GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.5.0
 
 ## Neu in 0.5.0
 - **KI-Assistent im rechten Chat-Panel** (optional, standardmäßig geschlossen): Antworten, Suche, Zusammenfassung und Editor-Aktionen
-- **Tool-Calls**: NovaNote führt Editor-Werkzeuge aus (`get_document`, `search_document`, `goto_line`, `select_lines`, `replace_all_text`, `replace_lines`, `insert_at_line`, `syntax_check`, `format_code`); Änderungen erst auf „Übernehmen“ oder automatisch
+- **Tool-Calls**: Die KI liest das Dokument selbst (`get_document`, `search_document`, `goto_line`, `select_lines`) und ändert es (`replace_all_text`, `replace_lines`, `insert_at_line`, `syntax_check`, `format_code`); der Dokumenttext wird nicht automatisch geschickt — das spart Tokens. Änderungen erst auf „Übernehmen“ oder automatisch
 - **Anbieter-Verwaltung** mit Auto-Scan: Modelle, Kontextgröße, Vision und Tool-Support; Adresse und API-Key frei editierbar, API-Key per DPAPI verschlüsselt
 - **Text-Fallback** für Modelle ohne native Tools (```nova```-Block)
 - **Codeübernahme** aus Antwort-Codeblöcken, Multi-Turn-Chat, Abbrechen, Panel-Breite bleibt erhalten
@@ -37,7 +37,8 @@ Ohne KI nutzt NovaNote nur den Editor — das Panel ist zu, es laufen keine Anfr
 2. NovaNote: Menü „KI → KI-Einstellungen…“ → Anbieter auswählen, Adresse prüfen, dann „Modelle scannen“.
 3. Panel öffnen über „KI → KI-Panel“ oder `Strg+Alt+K`; aktives Modell und Anbieter stehen als Dropdown im Panel.
    Die Breite bleibt nach dem Zerren am Trenner gespeichert.
-4. Der Chat schickt den aktuellen Dokumenttext als Kontext mit. Das Modell antwortet in Text oder ruft Werkzeuge auf.
+4. Die KI bekommt nur Dateiinfos (Name, Sprache, Zeilenzahl) als Systemprompt. Sie entscheidet selbst, ob sie über
+   `get_document`/`search_document` im Dokument liest, und antwortet dann in Text oder ruft ein Bearbeitungs-Werkzeug auf.
 5. Editor-Aktionen werden standardmäßig erst nach „Übernehmen“ ausgeführt; „KI → Aktionen automatisch anwenden“
    führt sie sofort aus. `Strg+Z` macht übernommene Änderungen rückgängig.
 6. Modelle ohne native Tool-Aufrufe nutzen ein Text-Format (```nova```-Block), das NovaNote ebenfalls ausführt.

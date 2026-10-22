@@ -151,6 +151,7 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`. Python-LS
 - `AiStore`: `Load()`, `Save()`, `State` (`Providers`, `ActiveProviderId`), `ActiveProvider`, `SetActiveProvider(id)`, `MergeScanned(provider, models)`, `NewId(prefix)`, `KindLabel/KindFromLabel`, `ReplaceState(list, activeId)`; `AiProvider.ApiKey` (de)kodiert DPAPI in `ApiKeyEnc`; `AiModel.DisplayName/Context/Vision/Tools` für UI
 - `LocalAiClient`: `ScanAsync(provider, ct)`, `ChatAsync(provider, model, messages, tools, ct)` → `AiReply { Content, ToolCalls, ToolsAccepted, Error }`; `ExtractCodeBlock`, `ParseFallbackToolCalls`; Base-URL-Normalisierung; HTTP-Retry ohne `tools` wenn der Server Tools ablehnt
 - `AiTools`: `Execute(string name, string argsJson, DocumentView view)` → String-Ergebnis; `IsEditTool(name)`; 9 Tools; Edit-Tools rufen `ReplaceAllText`/`ReplaceLines`/`InsertLine` (eine Undo-Group)
+- `MainWindow.BuildAiSystemPrompt(model)`: nur Datei-/Sprach-/Zeileninfo (+ Auswahl), **kein Dokumenttext** — die KI liest bei Bedarf selbst über `get_document`/`search_document`; das spart Tokens. `TrimAiTranscript` hält max 12 Nicht-System-Nachrichten
 - `AiSettingsDialog`: `AiStore.ReplaceState` bei OK, `SessionStore.Prefs.AiAutoApply`; `DialogWindow`-Style hat `SizeToContent=WidthAndHeight`
 
 ### `SessionStore`
