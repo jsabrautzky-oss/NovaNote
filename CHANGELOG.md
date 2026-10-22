@@ -22,6 +22,7 @@ NovaNote 0.5.0 ist die erste Release-Version mit der optionalen lokalen KI-Anbin
 - Editor-Tabs werden beim Schließen, Detach und Beenden sauber disposed
 
 ### Behoben / Fixes
+- Update-Setup: der Download hielt die Datei bis zum Start offen (`using var file` im selben Block), wodurch `Process.Start` mit „von einem anderen Prozess verwendet“ fehlschlug. Streams werden jetzt vor dem Start geschlossen.
 - ComboBoxen zeigen das ausgewählte Element im geschlossenen Feld (vorher leer, weil der eigene Style keinen Inhalt gebunden hatte)
 - KI-Einstellungsdialog: „Neu“/„Löschen“ und „Editor-Aktionen automatisch anwenden“ bekommen eigene Zeilen und überlappen nicht mehr; der Dialog passt sich per SizeToContent an den Inhalt an
 - Hell-Schema: `SelectionColor` war `#005FB859` (Alpha `00` = komplett transparent), markierter Text war nicht sichtbar. Jetzt `#59005FB8`.

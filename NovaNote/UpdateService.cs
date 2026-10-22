@@ -215,14 +215,7 @@ namespace NovaNote
                 var setupPath = Path.Combine(Path.GetTempPath(), SetupAssetName);
                 if (File.Exists(setupPath)) File.Delete(setupPath);
 
-                using var client = new HttpClient();
-                client.Timeout = TimeSpan.FromMinutes(10);
-                var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-                response.EnsureSuccessStatusCode();
-
-                using var stream = await response.Content.ReadAsStreamAsync();
-                using var file = new FileStream(setupPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await stream.CopyToAsync(file);
+                await DownloadSetupAsync(url, setupPath);
 
                 if (owner is AboutDialog) owner.Close();
 
@@ -245,6 +238,19 @@ namespace NovaNote
                 _downloadActive = false;
                 owner.Cursor = oldCursor;
             }
+        }
+
+        static async Task DownloadSetupAsync(string url, string setupPath)
+        {
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromMinutes(10);
+            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var file = new FileStream(setupPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await stream.CopyToAsync(file);
+            file.Flush();
         }
 
         static void LaunchSetup(string setupPath)
