@@ -127,7 +127,7 @@
             </MenuItem>
 
             <MenuItem Header="Hilfe">
-                <MenuItem x:Name="HelpAboutItem" Header="Über NovaNote (WPF)" Click="HelpAbout_Click"/>
+                <MenuItem x:Name="HelpAboutItem" Header="Über NovaNote" Click="HelpAbout_Click"/>
             </MenuItem>
         </Menu>
 
