@@ -336,10 +336,13 @@ namespace NovaNote
 
         // ---------- Dirty/Events ----------
 
+        bool _promptAnswered;
+
         void SetDirty(bool dirty)
         {
             if (IsDirty == dirty) return;
             IsDirty = dirty;
+            _promptAnswered = false;
             DirtyChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1428,6 +1431,7 @@ namespace NovaNote
         {
             if (!IsDirty) return true;
             if (!SessionStore.Prefs.AskSaveOnClose) return true;
+            if (_promptAnswered) return true;
             string name = Path_ == null ? "Unbenannt" : System.IO.Path.GetFileName(Path_);
             var owner = Window.GetWindow(this);
             var r = owner != null
@@ -1439,8 +1443,11 @@ namespace NovaNote
                     "NovaNote – Speichern?", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (r == MessageBoxResult.Cancel) return false;
             if (r == MessageBoxResult.Yes) return SavePath();
+            _promptAnswered = true;
             return true;
         }
+
+        public void ResetPromptAnswered() => _promptAnswered = false;
 
         public bool SavePath()
         {

@@ -377,7 +377,12 @@ namespace NovaNote
             if (!PromptDirtyFocused(tab)) return;
             PushHistory(tab);
             RemoveTab(tab);
-            if (Tabs.Count == 0) AddView(NewView());
+            if (Tabs.Count == 0)
+            {
+                SaveSessionNow();
+                Close();
+                return;
+            }
         }
 
         void CloseAllTabs()
@@ -390,8 +395,13 @@ namespace NovaNote
                 PushHistory(tab);
                 RemoveTab(tab);
             }
-            if (Tabs.Count == 0) AddView(NewView());
-            else TabStrip.SelectedItem = Tabs[0];
+            if (Tabs.Count == 0)
+            {
+                SaveSessionNow();
+                Close();
+                return;
+            }
+            TabStrip.SelectedItem = Tabs[0];
             SaveSessionNow();
         }
 
@@ -687,6 +697,7 @@ namespace NovaNote
             var st = new SessionState();
             foreach (var w in Application.Current.Windows.OfType<MainWindow>())
             {
+                if (w.Tabs.Count == 0) continue;
                 var bounds = w.WindowState == System.Windows.WindowState.Normal
                     ? new Rect(w.Left, w.Top, w.Width, w.Height) : w.RestoreBounds;
                 var ws = new SessionWindow
@@ -714,6 +725,7 @@ namespace NovaNote
                 st.Windows.Add(ws);
             }
             if (st.Windows.Count > 0) SessionStore.SaveSession(st);
+            else SessionStore.ClearSession();
             _sessionDirty = false;
         }
 

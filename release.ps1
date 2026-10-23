@@ -1,8 +1,8 @@
 param(
-  [string]$version = "0.6.0",
+  [string]$version = "0.6.1",
   [string]$repo = "jsabrautzky-oss/NovaNote",
-  [string]$tag = "v0.6.0",
-  [string]$title = "NovaNote 0.6.0",
+  [string]$tag = "v0.6.1",
+  [string]$title = "NovaNote 0.6.1",
   [bool]$prerelease = $false,
   [bool]$skipPack = $false
 )
@@ -20,28 +20,22 @@ $gh = Get-Command gh -ErrorAction SilentlyContinue
 $ghPath = if ($gh) { $gh.Source } else { "C:\Program Files\GitHub CLI\gh.exe" }
 
 $notes = @(
-  'NovaNote 0.6.0 - Der KI-Chat kann Bilder (Vision) und die Statusleiste ist per Klick bedienbar. Leichter Windows-Texteditor (AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check) - optional mit lokaler KI-Anbindung, kein Cloud-Zwang.',
+  'NovaNote 0.6.1 - Bugfix-Release: Tab-Schließen wie im Browser und „nicht gespeichert" bleibt erhalten. Leichter Windows-Texteditor (AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check) - optional mit lokaler KI-Anbindung inkl. Bild-Chat (Vision), kein Cloud-Zwang.',
   '',
-  'Neu:',
-  '- Bildanhänge im Chat: +-Button (Mehrfachauswahl), Drag & Drop auf das Eingabefeld, Strg+V für Screenshots aus der Zwischenablage',
-  '- Vision-Erkennung ueber Server-Metadaten (vision, supports_vision, capabilities/modalities, projector, vision_* Zahlen) plus Modellnamen-Heuristik (vision, -vl, llava, pixtral, gemma-3, minicpm-v, moondream, gpt-4o, claude-3, gemini, glm-4v, internvl, phi-vision)',
-  '- "Vision erzwingen" pro Modell in den KI-Einstellungen; Status zeigt "Vision Ja (manuell)"',
-  '- OpenAI-kompatibles Payload: Bilder als data:image/...;base64 im content-Array (LM Studio, Ollama, llama-server); ohne Bilder bleibt content ein String',
-  '- Thumbnail-Chips vor dem Senden (48x48 mit Dateiname und x), Bilder in den Chat-Bubbles, Klick öffnet Lightbox (Escape schließt)',
-  '- Grosse Bilder werden auf 2048 px skaliert und als JPEG kodiert, max. 6 Bilder pro Nachricht; Bilder aus älteren Nachrichten werden entfernt',
-  '- Ohne Vision ist der +-Button deaktiviert (Tooltip) und Drag & Drop blockiert',
-  '- Statusleiste per Klick: Sprache (Menü, manuelle Auswahl deaktiviert "Automatisch erkennen"), Syntax-Check an/aus, Encoding, Zeilenende, Schriftgröße mit Schieberegler (40-300 %)',
-  '- Kontext-Menüs, Menü-Trenner und Slider sind vollständig gethemt (Dark Mode: dunkler Popup #2B2B2B, heller Text #FFFFFF)',
-  '- Sprache "Keine" heißt jetzt "Text"',
-  '- Beim Schließen wird jeder ungespeicherte Tab einzeln abgefragt (Speichern?/Verwerfen/Abbrechen), der Tab bekommt vorher den Fokus; die Sammel-Abfrage "Alle Tabs schließen" ist entfernt',
+  'Behoben:',
+  '- Schließt man den letzten Tab, wird das Fenster geschlossen (wie Chrome) statt einen neuen leeren Tab zu erzeugen; gilt auch für „Alle Tabs schließen" und Strg+W',
+  '- „Nein" im Speichern-Dialog behält den „nicht gespeichert"-Status: die Session merkt Dirty, der wiederhergestellte Tab bleibt mit Punkt markiert und wird beim nächsten Schließen erneut gefragt',
+  '- „Nein" wird pro Schließvorgang nur einmal gefragt (kein Doppel-Dialog bei „Alle Tabs schließen" + Fenster-Schließen); neue Änderungen setzen die Markierung zurück',
+  '- SaveSessionNow() übersieht Fenster ohne Tabs und löscht die Session, wenn kein Fenster mehr Tabs hat',
   '',
-  'Enthalten:',
+  'Enthalten (seit 0.6.0):',
+  '- Bildanhänge im Chat: +-Button, Drag & Drop, Strg+V für Screenshots; Vision-Erkennung ueber Metadaten plus Namens-Heuristik, „Vision erzwingen" pro Modell',
+  '- Bilder als data:image-Array im OpenAI-kompatiblen Payload (LM Studio, Ollama, llama-server); Thumbnails in den Chat-Bubbles mit Lightbox (Escape schließt)',
   '- Chat als WebView2-Ansicht (Markdown, Streaming, Tool-Cards mit Bestaetigen/Verwerfen, Codeblock "Kopieren"/"In Editor einfuegen")',
-  '- Optionales KI-Panel (Strg+Alt+K) mit Tool-Calls: get_document, search_document, goto_line, select_lines, replace_all_text, replace_lines, insert_at_line, syntax_check, format_code',
-  '- Anbieter-Verwaltung (LM Studio, Ollama, OpenAI-kompatibel, eigene Adresse) mit Modell-Auto-Scan; API-Key verschluesselt (DPAPI)',
-  '- Velopack-Installer (NovaNote-win-Setup.exe), Portable-Zip, Delta ab 0.5.2',
-  '- Microsoft.Web.WebView2 und WebView2Loader.dll im Paket',
-  '- Markdown, Python, C# und YAML; Dateiendungen .txt/.md/.markdown/.json/.xml/.html ueber HKCU-ProgID NovaNote.Editor',
+  '- Statusleiste per Klick: Sprache, Syntax-Check an/aus, Encoding, Zeilenende, Schriftgröße mit Schieberegler (40-300 %); Menü/Slider gethemt (Dark Mode)',
+  '- Beim Schließen wird jeder ungespeicherte Tab einzeln abgefragt, der Tab bekommt vorher den Fokus',
+  '- Optionales KI-Panel (Strg+Alt+K) mit Tool-Calls; Anbieter-Verwaltung mit Modell-Auto-Scan, API-Key per DPAPI',
+  '- Velopack-Installer (NovaNote-win-Setup.exe), Portable-Zip, Delta ab 0.6.0',
   '',
   'Hinweis: Die KI ist optional und laeuft nur gegen einen lokalen OpenAI-kompatiblen Server (LM Studio, Ollama, llama-server).'
 ) -join "`n"

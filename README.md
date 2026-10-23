@@ -2,8 +2,13 @@
 
 **Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-Aktuelle Version: **0.6.0**  
-GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.6.0
+Aktuelle Version: **0.6.1**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.6.1
+
+## Neu in 0.6.1
+- Der letzte Tab schließt jetzt das Fenster (wie Chrome) — statt einen neuen leeren Tab zu erzeugen; „Alle Tabs schließen“ und `Strg+W` auf dem letzten Tab machen dasselbe
+- Bugfix: Nach „Nein“ im Speichern-Dialog bleibt ein Tab als „nicht gespeichert“ markiert — auch nach dem Neustart (Session merkt `Dirty`), und beim nächsten Schließen wird wieder gefragt
+- Eine beantwortete „Nein“-Abfrage wird pro Schließvorgang nur einmal gestellt (kein Doppel-Dialog bei „Alle Tabs schließen“ + Fenster-Schließen)
 
 ## Neu in 0.6.0
 - **Bilder im Chat (Vision)**: `+`-Buttonanhänge (Mehrfachauswahl), Drag & Drop auf das Eingabefeld und `Strg+V` für Screenshots aus der Zwischenablage
@@ -41,8 +46,8 @@ GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.6.0
 - Rechtsklick-Menü: Aktionen erscheinen nur, wenn sie passen (Kopieren/Ausschneiden nur mit Auswahl, Einfügen nur mit Zwischenablage, JSON-/Code-Formatierung, Python-Completion, Markdown-Vorschau je nach Sprache)
 - Statusleiste: alles per Klick änderbar — Sprache (Menü, manuelle Auswahl schaltet „Automatisch erkennen“ aus), Encoding (UTF-8, UTF-8 mit BOM, UTF-16 LE/BE, ANSI), Zeilenende (Windows/Unix/Macintosh), Schriftgröße (Schieberegler 40–300 %) und Syntax-Check (Klick schaltet an/aus). Menüs und Regler folgen dem Theme (Dark Mode: dunkler Popup-Hintergrund, heller Text)
 - Code-Folding (abschaltbar) und Whitespace-Anzeige
-- Mehrfach-Tabs und Tabs in eigene Fenster lösen
-- Session-Wiederherstellung: Fenster und Tabs beim nächsten Start wieder öffnen
+- Mehrfach-Tabs und Tabs in eigene Fenster lösen; der letzte Tab schließt das Fenster (wie Chrome)
+- Session-Wiederherstellung: Fenster und Tabs beim nächsten Start wieder öffnen; ungespeicherte Tabs bleiben dabei als „nicht gespeichert“ markiert
 - Suchen/Ersetzen, Gehe zu Zeile, Zoom, Word-Wrap, Line Numbers, Schriftart, `F5` für Datum/Uhrzeit
 - JSON-Formatierung mit `Strg+Umschalt+J`, Code-Formatierung Python/C# mit `Strg+Umschalt+F`
 - Encoding-Einstellungen: UTF-8, UTF-8 BOM, UTF-16 LE/BE, ANSI
@@ -117,7 +122,7 @@ Hinweis: Weitere Sprachen sollen später folgen.
 4. Optional: `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` per Doppelklick mit NovaNote öffnen.
 
 Direkter Installer-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.0/NovaNote-win-Setup.exe
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.1/NovaNote-win-Setup.exe
 
 ## Installation als Portable-Version
 1. `NovaNote-win-Portable.zip` von der GitHub-Release-Seite herunterladen.
@@ -125,7 +130,7 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.0/NovaNote-wi
 3. `NovaNote.exe` starten.
 
 Direkter Portable-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.0/NovaNote-win-Portable.zip
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.1/NovaNote-win-Portable.zip
 
 ## Updates
 - NovaNote kann beim Start automatisch prüfen, ob auf GitHub ein neuer Release mit `NovaNote-win-Setup.exe` vorhanden ist.

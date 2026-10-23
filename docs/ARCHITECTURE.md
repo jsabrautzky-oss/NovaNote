@@ -1,7 +1,7 @@
 # NovaNote — interne Architektur-Landkarte
 
 Repo: https://github.com/jsabrautzky-oss/NovaNote  
-Aktuelle Version: 0.6.0  
+Aktuelle Version: 0.6.1  
 
 Diese Datei ist nur für interne Coding-/KI-Agenten gedacht und nicht für öffentliche Nutzerdoku. Sie soll Scannen des ganzen Codes vermeiden. Alles Wichtige ist hier zusammengefasst: Komponenten, Abhängigkeiten, öffentliche APIs, Fluss, Fallstricke.
 
@@ -26,7 +26,7 @@ Das Script erzeugt:
 
 GitHub-Release erzeugen und hochladen (nach `gh auth login` oder mit `GH_TOKEN`):
 ```powershell
-powershell -Command "& .\release.ps1 -version 0.6.0 -repo jsabrautzky-oss/NovaNote -tag v0.6.0 -title 'NovaNote 0.6.0' -prerelease $false"
+powershell -Command "& .\release.ps1 -version 0.6.1 -repo jsabrautzky-oss/NovaNote -tag v0.6.1 -title 'NovaNote 0.6.1' -prerelease $false"
 powershell -Command "& .\release.ps1 -skipPack $true"    # nutzt die bereits gepackten Artefakte in Releases/
 ```
 Boolesche Parameter über `-File` werden als String übergeben und schlagen fehl; deshalb `powershell -Command "& .\release.ps1 …"` schreiben. Die Notizen werden per temporärer `release-notes.txt` übergeben (`--notes-file`), weil mehrzeilige Notes als Bash-Argument von `gh` zerlegt werden.
@@ -34,7 +34,7 @@ Boolesche Parameter über `-File` werden als String übergeben und schlagen fehl
 Wichtige Velopack-Parameter:
 - `packId`: `NovaNote`
 - `mainExe`: `NovaNote.exe`
-- `packVersion`: `0.6.0`
+- `packVersion`: `0.6.1`
 - `icon`: `NovaNote\novanote.ico`
 - `runtime`: `win-x64`
 
@@ -153,7 +153,8 @@ JSON/XML-Check nutzen BCL: `System.Text.Json`, `System.Xml.XmlReader`. Python-LS
 - Menü „Sprachen“ enthält Text (`DocLanguage.None`), JSON, XML, HTML, CSS, JavaScript, C++, Markdown, Python, C#, YAML sowie `CodeFormatItem` (Python/C#) und `PythonCompletionItem` (nur wenn Python-LSP ready); `Language_Click` setzt `Prefs.LanguageAuto = false` (manuelle Auswahl) und `LangAuto_Click` liest den Klick von `sender` (Menü oder Status-Menü)
 - `StatusLanguage` ist anklickbar (`StatusLanguage_Click` → `_langMenu` als `ContextMenu` mit allen Sprachen + „Automatisch erkennen“, `PlacementMode.Top`); die Statuszeile zeigt `DocLanguages.DisplayName(Lang)` (+ „ · Automatik“, wenn Auto an)
 - Weitere Statusleisten-Klicks: `StatusSyntax_Click` → `SetSyntaxCheckAll(!Prefs.SyntaxCheck)` (setzt auch `SyntaxCheckItem.IsChecked`), `StatusEncoding_Click` → `_encMenu` (5 Encodings, reuse `Encoding_Click`), `StatusEol_Click` → `_eolMenu` (3 Zeilenenden, reuse `Eol_Click`), `StatusZoom_Click` → `ZoomPopup` mit `ZoomSlider` (40–300 %, `ZoomSlider_Changed` → `ActiveView.SetZoom`); `UpdateEncodingChecks`/`UpdateEolChecks` synchronisieren die Menü-Checks, `UpdateStatusNow` aktualisiert den Regler, solange das Popup offen ist
-- `PromptDirtyFocused(tab)` aktiviert den Tab (`ActivateTab`) und ruft dann `View.PromptDirty()`; `CloseTab`, `CloseAllTabs`, `MainWindow_Closing`, `SaveSessionForUpdate` und `TabMode_Click` (Einziger-Tab-Modus) nutzen diese Reihenfolge, damit jeder ungespeicherte Tab mit Fokus abgefragt wird. Der frühere Sammel-Dialog „Alle Tabs schließen“ in `MainWindow_Closing` ist entfernt
+- `PromptDirtyFocused(tab)` aktiviert den Tab (`ActivateTab`) und ruft dann `View.PromptDirty()`; `CloseTab`, `CloseAllTabs`, `MainWindow_Closing`, `SaveSessionForUpdate` und `TabMode_Click` (Einziger-Tab-Modus) nutzen diese Reihenfolge, damit jeder ungespeicherte Tab mit Fokus abgefragt wird. Der frühere Sammel-Dialog „Alle Tabs schließen“ in `MainWindow_Closing` ist entfernt. `PromptDirty()` fragt nur einmal pro Tab („Nein“ setzt `_promptAnswered`, nicht `IsDirty`) — der Tab bleibt „nicht gespeichert“ und die Session behält `Dirty` beim Wiederherstellen (`RestoreSession` setzt `IsDirty = dirty`); `SetDirty` (neue Änderung oder Speichern) setzt `_promptAnswered` zurück
+- `CloseTab`/`CloseAllTabs` rufen nach dem letzten Tab `SaveSessionNow()` + `Close()` (Fenster wird geschlossen wie im Browser); `SaveSessionNow()` übersieht Fenster mit 0 Tabs und ruft `SessionStore.ClearSession()`, wenn kein Fenster Tabs hat
 - `Theme/Controls.xaml` hat einen `Slider`-Style (`SliderRepeatStyle` = Accent-Füllung links, `SliderRepeatTransparentStyle` rechts, `Track` mit `PART_Track`/`Thumb` als Ellipse in `AccentBrush`, Track `InputBgBrush`)
 - `Theme/Controls.xaml` hat einen eigenen `Style` für `ContextMenu` (`PopupBgBrush`, `PopupBorderBrush`, `TextBrush`, abgerundetes Border mit DropShadow); ohne dieses Template wäre das Popup im Dark Mode hell und der Text darin dunkel
 - Menü „KI“ enthält `AiPanelItem` (checkable), `AiAutoApplyItem` (checkable), `AiScanItem`, `AiSettingsItem`; Panel-Header nutzt `AiProviderBox`/`AiModelBox` (ComboBoxen) und `AiStatus`; Ausgabe ist `wv:WebView2 x:Name="AiChat"` (WebView2) mit `TextBox x:Name="AiLog"` als Fallback (beide `Collapsed` bis `EnsureChatAsync` bzw. `_chatUnavailable`); Eingabe bleibt nativ: `AiInput`, `AiSendButton`, `AiCancelButton`, `AiClearButton` (kein `AiApplyButton`/`AiDiscardButton` mehr — Bestätigung im Tool-Card).

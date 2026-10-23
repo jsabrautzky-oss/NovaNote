@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1
+Tab-Schließen verhält sich wie im Browser, und „nicht gespeichert" bleibt erhalten.
+
+- Schließt man den letzten Tab, wird das Fenster geschlossen (wie Chrome) — statt einen neuen leeren Tab zu erstellen; „Alle Tabs schließen“ und `Strg+W` auf dem letzten Tab machen dasselbe
+- Bugfix: „Nein“ im Speichern-Dialog behält den „nicht gespeichert“-Status des Tabs — die Session speichert `Dirty` und der wiederhergestellte Tab bleibt mit Punkt markiert und wird beim nächsten Schließen erneut gefragt (vorher ging der Status beim Schließen verloren)
+- Eine abantwortete „Nein“-Abfrage wird pro Tab nur einmal gestellt (`_promptAnswered`), damit „Alle Tabs schließen“ + Fenster-Schließen nicht doppelt fragt; neue Änderungen setzen die Markierung zurück
+- `SaveSessionNow()` ignoriert Fenster ohne Tabs und löscht die Session, wenn kein Fenster mehr Tabs hat
+
+### Paket
+- Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.6.1-full.nupkg`, Delta von 0.6.0 (`NovaNote-0.6.1-delta.nupkg`)
+
 ## 0.6.0
 Der KI-Chat kann Bilder (Vision) — nur wenn das aktive Modell Bilder versteht. Die Statusleiste ist per Klick bedienbar, Kontext-Menüs und Schieberegler folgen dem Theme (Dark Mode), und beim Schließen wird jeder ungespeicherte Tab einzeln mit Fokus abgefragt.
 
