@@ -1427,6 +1427,7 @@ namespace NovaNote
         public bool PromptDirty()
         {
             if (!IsDirty) return true;
+            if (!SessionStore.Prefs.AskSaveOnClose) return true;
             string name = Path_ == null ? "Unbenannt" : System.IO.Path.GetFileName(Path_);
             var owner = Window.GetWindow(this);
             var r = owner != null

@@ -43,6 +43,13 @@ namespace NovaNote
         GoToDialog _gotoDlg;
         DispatcherTimer _autosave;
         DispatcherTimer _status;
+        readonly ContextMenu _langMenu = new ContextMenu();
+        readonly List<MenuItem> _langMenuItems = new List<MenuItem>();
+        MenuItem _langAutoMenuItem;
+        readonly ContextMenu _encMenu = new ContextMenu();
+        readonly List<MenuItem> _encMenuItems = new List<MenuItem>();
+        readonly ContextMenu _eolMenu = new ContextMenu();
+        readonly List<MenuItem> _eolMenuItems = new List<MenuItem>();
         Point? _dragStart;
         TabModel _dragTab;
         bool _closingForUpdate;
@@ -56,6 +63,8 @@ namespace NovaNote
         string _aiPendingChatId;
         int _aiPendingRound;
         AiSettingsDialog _aiDlg;
+        readonly ObservableCollection<ChatImage> _attachments = new ObservableCollection<ChatImage>();
+        DateTime _lastDropHint;
 
         static CoreWebView2Environment _chatEnv;
         static readonly JsonSerializerOptions ChatJson = new JsonSerializerOptions
@@ -88,6 +97,8 @@ namespace NovaNote
             ThemeService.ThemeChanged += OnThemeChanged;
             Closed += (s, e) => ThemeService.ThemeChanged -= OnThemeChanged;
             SetupBindings();
+            BuildStatusLanguageMenu();
+            BuildStatusEncodingMenus();
             TabStrip.ItemsSource = Tabs;
             TabStrip.SizeChanged += (s, e) => UpdateTabWidths();
             SizeChanged += (s, e) => SyncDefaultAiWidth();
@@ -292,6 +303,13 @@ namespace NovaNote
             tab.View.FocusEditor();
         }
 
+        bool PromptDirtyFocused(TabModel tab)
+        {
+            if (tab == null || !tab.View.IsDirty) return true;
+            ActivateTab(tab);
+            return tab.View.PromptDirty();
+        }
+
         void SwitchTab(int dir)
         {
             if (Tabs.Count == 0) return;
@@ -356,7 +374,7 @@ namespace NovaNote
         public void CloseTab(TabModel tab)
         {
             if (tab == null) return;
-            if (!tab.View.PromptDirty()) return;
+            if (!PromptDirtyFocused(tab)) return;
             PushHistory(tab);
             RemoveTab(tab);
             if (Tabs.Count == 0) AddView(NewView());
@@ -366,7 +384,7 @@ namespace NovaNote
         {
             var tabs = Tabs.ToList();
             foreach (var tab in tabs)
-                if (!tab.View.PromptDirty()) return;
+                if (!PromptDirtyFocused(tab)) return;
             foreach (var tab in tabs)
             {
                 PushHistory(tab);
@@ -458,7 +476,110 @@ namespace NovaNote
             StatusEncoding.Text = Codec.Name(v.Enc);
             StatusEol.Text = Codec.EolName(v.Eol);
             StatusZoom.Text = v.Zoom + " %";
-            StatusLanguage.Text = v.StatusLanguage;
+            if (ZoomPopup?.IsOpen == true)
+            {
+                ZoomSlider.Value = v.Zoom;
+                ZoomSliderValue.Text = v.Zoom + " %";
+            }
+            StatusLanguage.Text = v.StatusLanguage + (SessionStore.Prefs.LanguageAuto ? " · Automatik" : "");
+        }
+
+        void BuildStatusLanguageMenu()
+        {
+            foreach (var (header, tag) in new[]
+            {
+                ("Text", "None"), ("JSON", "Json"), ("XML", "Xml"), ("HTML", "Html"), ("CSS", "Css"),
+                ("JavaScript", "JavaScript"), ("C++", "Cpp"), ("Markdown", "Markdown"),
+                ("Python", "Python"), ("C#", "CSharp"), ("YAML", "Yaml")
+            })
+            {
+                var mi = new MenuItem { Header = header, Tag = tag, IsCheckable = true };
+                mi.Click += Language_Click;
+                _langMenuItems.Add(mi);
+                _langMenu.Items.Add(mi);
+            }
+            _langMenu.Items.Add(new Separator());
+            _langAutoMenuItem = new MenuItem { Header = "Automatisch erkennen", IsCheckable = true };
+            _langAutoMenuItem.Click += LangAuto_Click;
+            _langMenu.Items.Add(_langAutoMenuItem);
+            StatusLanguage.ContextMenu = _langMenu;
+        }
+
+        void StatusLanguage_Click(object sender, MouseButtonEventArgs e)
+        {
+            UpdateLanguageChecks();
+            _langMenu.PlacementTarget = StatusLanguage;
+            _langMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+            _langMenu.IsOpen = true;
+            e.Handled = true;
+        }
+
+        void BuildStatusEncodingMenus()
+        {
+            foreach (var (header, tag) in new[]
+            {
+                ("UTF-8", "Utf8"), ("UTF-8 mit BOM", "Utf8Bom"), ("UTF-16 LE", "Utf16Le"),
+                ("UTF-16 BE", "Utf16Be"), ("ANSI", "Ansi")
+            })
+            {
+                var mi = new MenuItem { Header = header, Tag = tag, IsCheckable = true };
+                mi.Click += Encoding_Click;
+                _encMenuItems.Add(mi);
+                _encMenu.Items.Add(mi);
+            }
+            foreach (var (header, tag) in new[]
+            {
+                ("Windows (CRLF)", "CrLf"), ("Unix (LF)", "Lf"), ("Macintosh (CR)", "Cr")
+            })
+            {
+                var mi = new MenuItem { Header = header, Tag = tag, IsCheckable = true };
+                mi.Click += Eol_Click;
+                _eolMenuItems.Add(mi);
+                _eolMenu.Items.Add(mi);
+            }
+            StatusEncoding.ContextMenu = _encMenu;
+            StatusEol.ContextMenu = _eolMenu;
+        }
+
+        void StatusEncoding_Click(object sender, MouseButtonEventArgs e)
+        {
+            UpdateEncodingChecks();
+            _encMenu.PlacementTarget = StatusEncoding;
+            _encMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+            _encMenu.IsOpen = true;
+            e.Handled = true;
+        }
+
+        void StatusEol_Click(object sender, MouseButtonEventArgs e)
+        {
+            UpdateEolChecks();
+            _eolMenu.PlacementTarget = StatusEol;
+            _eolMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+            _eolMenu.IsOpen = true;
+            e.Handled = true;
+        }
+
+        void StatusSyntax_Click(object sender, MouseButtonEventArgs e)
+        {
+            SetSyntaxCheckAll(!SessionStore.Prefs.SyntaxCheck);
+            e.Handled = true;
+        }
+
+        void StatusZoom_Click(object sender, MouseButtonEventArgs e)
+        {
+            var zoom = ActiveView?.Zoom ?? 100;
+            ZoomSlider.Value = zoom;
+            ZoomSliderValue.Text = zoom + " %";
+            ZoomPopup.IsOpen = true;
+            e.Handled = true;
+        }
+
+        void ZoomSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (ZoomSliderValue == null) return;
+            ZoomSliderValue.Text = (int)e.NewValue + " %";
+            ActiveView?.SetZoom((int)e.NewValue);
+            UpdateStatus();
         }
 
         void UpdateLanguageChecks()
@@ -476,6 +597,9 @@ namespace NovaNote
             LangPythonItem.IsChecked = lang == DocLanguage.Python;
             LangCSharpItem.IsChecked = lang == DocLanguage.CSharp;
             LangYamlItem.IsChecked = lang == DocLanguage.Yaml;
+            foreach (var mi in _langMenuItems)
+                mi.IsChecked = Enum.TryParse<DocLanguage>(mi.Tag as string, out var l) && l == lang;
+            if (_langAutoMenuItem != null) _langAutoMenuItem.IsChecked = SessionStore.Prefs.LanguageAuto;
             LangJsonFormatItem.IsEnabled = lang == DocLanguage.Json;
             CodeFormatItem.IsEnabled = ActiveView?.FormatSupported == true;
             PythonCompletionItem.IsEnabled = ActiveView?.PythonLspReady == true;
@@ -486,6 +610,7 @@ namespace NovaNote
             var v = ActiveView;
             TabModeItem.IsChecked = SessionStore.Prefs.MultiTab;
             SessionRestoreItem.IsChecked = SessionStore.Prefs.RestoreSession;
+            AskSaveOnCloseItem.IsChecked = SessionStore.Prefs.AskSaveOnClose;
             TabRestoreItem.IsEnabled = ClosedHistory.Count > 0;
             TabDetachItem.IsEnabled = SessionStore.Prefs.MultiTab;
             FormatWrapItem.IsChecked = v?.WordWrap == true;
@@ -522,6 +647,8 @@ namespace NovaNote
             EncUtf16LeItem.IsChecked = v?.Enc == NovaNoteEncoding.Utf16Le;
             EncUtf16BeItem.IsChecked = v?.Enc == NovaNoteEncoding.Utf16Be;
             EncAnsiItem.IsChecked = v?.Enc == NovaNoteEncoding.Ansi;
+            foreach (var mi in _encMenuItems)
+                mi.IsChecked = mi.Tag is string t && Enum.TryParse<NovaNoteEncoding>(t, out var e2) && v?.Enc == e2;
         }
 
         void UpdateEolChecks()
@@ -530,6 +657,8 @@ namespace NovaNote
             EolCrLfItem.IsChecked = v?.Eol == LineEnding.CrLf;
             EolLfItem.IsChecked = v?.Eol == LineEnding.Lf;
             EolCrItem.IsChecked = v?.Eol == LineEnding.Cr;
+            foreach (var mi in _eolMenuItems)
+                mi.IsChecked = mi.Tag is string t && Enum.TryParse<LineEnding>(t, out var e2) && v?.Eol == e2;
         }
 
         void UpdateThemeChecks()
@@ -592,7 +721,7 @@ namespace NovaNote
         {
             foreach (var tab in Tabs.ToList())
             {
-                if (!tab.View.PromptDirty())
+                if (!PromptDirtyFocused(tab))
                     return false;
             }
             SaveSessionNow();
@@ -626,21 +755,9 @@ namespace NovaNote
             }
 
             var tabs = Tabs.ToList();
-            if (SessionStore.Prefs.MultiTab && tabs.Count >= 2)
-            {
-                var r = MessageBox.Show(this,
-                    $"NovaNote schließen? Es sind {tabs.Count} Tabs geöffnet.\n\n" +
-                    "Möchten Sie alle Tabs schließen und das Fenster schließen?",
-                    "Alle Tabs schließen", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (r != MessageBoxResult.Yes)
-                {
-                    e.Cancel = true;
-                    return;
-                }
-            }
             foreach (var tab in tabs)
             {
-                if (!tab.View.PromptDirty())
+                if (!PromptDirtyFocused(tab))
                 {
                     e.Cancel = true;
                     return;
@@ -774,6 +891,8 @@ namespace NovaNote
             if (sender is MenuItem mi && mi.Tag is string tag &&
                 Enum.TryParse<DocLanguage>(tag, out var lang))
             {
+                SessionStore.Prefs.LanguageAuto = false;
+                SessionStore.SavePrefs();
                 ActiveView?.SetLanguage(lang);
                 UpdateLanguageChecks();
                 UpdateStatus();
@@ -782,9 +901,10 @@ namespace NovaNote
 
         void LangAuto_Click(object sender, RoutedEventArgs e)
         {
-            SessionStore.Prefs.LanguageAuto = LangAutoItem.IsChecked;
+            bool on = sender is MenuItem mi ? mi.IsChecked : LangAutoItem.IsChecked;
+            SessionStore.Prefs.LanguageAuto = on;
             SessionStore.SavePrefs();
-            if (SessionStore.Prefs.LanguageAuto) ActiveView?.DetectLanguage();
+            if (on) ActiveView?.DetectLanguage();
             UpdateLanguageChecks();
             UpdateStatus();
         }
@@ -882,7 +1002,7 @@ namespace NovaNote
                 var extras = Tabs.Take(Math.Max(0, Tabs.Count - 1)).ToList();
                 foreach (var tab in extras)
                 {
-                    if (!tab.View.PromptDirty())
+                    if (!PromptDirtyFocused(tab))
                     {
                         TabModeItem.IsChecked = true;
                         return;
@@ -907,6 +1027,12 @@ namespace NovaNote
             else SaveSessionNow();
         }
 
+        void AskSaveOnClose_Click(object sender, RoutedEventArgs e)
+        {
+            SessionStore.Prefs.AskSaveOnClose = AskSaveOnCloseItem.IsChecked;
+            SessionStore.SavePrefs();
+        }
+
         void ViewLineNumbers_Click(object sender, RoutedEventArgs e)
         {
             SessionStore.Prefs.ShowLineNumbers = ViewLineNumbersItem.IsChecked;
@@ -927,6 +1053,7 @@ namespace NovaNote
         {
             SessionStore.Prefs.SyntaxCheck = on;
             SessionStore.SavePrefs();
+            SyntaxCheckItem.IsChecked = on;
             foreach (var w in Application.Current.Windows.OfType<MainWindow>())
                 foreach (var t in w.Tabs) t.View.SetSyntaxCheck(on);
             UpdateStatus();
@@ -1123,17 +1250,149 @@ namespace NovaNote
             {
                 AiStatus.Text = "KI: kein Anbieter erfasst";
                 AiStatus.ToolTip = "KI → KI-Einstellungen…";
+                UpdateAiAttachUi();
                 return;
             }
             if (model == null)
             {
                 AiStatus.Text = $"KI: {provider.Name} · kein Modell · KI → Modelle scannen";
                 AiStatus.ToolTip = provider.BaseUrl;
+                UpdateAiAttachUi();
                 return;
             }
+            string vision = model.VisionOverride.HasValue
+                ? (model.VisionEnabled ? "Ja (manuell)" : "Nein (manuell)")
+                : (model.Vision ? "Ja" : "Nein");
             AiStatus.Text = $"KI: {provider.Name} · {model.DisplayName} · Kontext {model.ContextLength} · " +
-                            $"Vision {(model.Vision ? "Ja" : "Nein")} · Tools {(model.SupportsTools ? "Ja" : "Nein")}";
+                            $"Vision {vision} · Tools {(model.SupportsTools ? "Ja" : "Nein")}";
             AiStatus.ToolTip = $"{provider.BaseUrl} · Modell-ID {model.Id}";
+            UpdateAiAttachUi();
+        }
+
+        bool VisionReady() => AiStore.SupportsVision(AiStore.ActiveProvider?.ActiveModel);
+
+        void UpdateAiAttachUi()
+        {
+            if (AiAttachButton == null) return;
+            bool vision = VisionReady();
+            AiAttachButton.IsEnabled = vision && !_aiBusy;
+            AiAttachButton.ToolTip = vision
+                ? "Bild anhängen (auch Drag & Drop auf das Eingabefeld oder Strg+V für Screenshots)"
+                : "Das aktuelle Modell unterstützt keine Bilder (Vision)";
+            AiInput.AllowDrop = vision;
+            AiAttachStrip.Visibility = _attachments.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (!vision && _attachments.Count > 0) ClearAttachments();
+        }
+
+        void ClearAttachments()
+        {
+            _attachments.Clear();
+            UpdateAiAttachUi();
+        }
+
+        void AddAttachment(ChatImage image)
+        {
+            if (image == null)
+            {
+                AppendAi("Bild konnte nicht gelesen werden.");
+                return;
+            }
+            if (!VisionReady())
+            {
+                AppendAi("Das aktuelle Modell unterstützt keine Bilder (Vision) — Anhang ignoriert.");
+                return;
+            }
+            if (_attachments.Count >= ChatImages.MaxImages)
+            {
+                AppendAi($"Maximal {ChatImages.MaxImages} Bilder pro Nachricht.");
+                return;
+            }
+            _attachments.Add(image);
+            UpdateAiAttachUi();
+            string extra = string.IsNullOrEmpty(image.Note) ? "" : $" — {image.Note}";
+            AppendAi($"Bild angehängt: {image.FileName} ({image.Bytes} Bytes){extra}");
+        }
+
+        void AiAttach_Click(object sender, RoutedEventArgs e)
+        {
+            if (!VisionReady())
+            {
+                AppendAi("Das aktuelle Modell unterstützt keine Bilder (Vision). KI → Modelle scannen oder in „KI-Einstellungen“ Vision erzwingen.");
+                return;
+            }
+            var dlg = new OpenFileDialog
+            {
+                Filter = "Bilder (*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp|Alle Dateien (*.*)|*.*",
+                Multiselect = true
+            };
+            if (dlg.ShowDialog(this) != true) return;
+            foreach (var file in dlg.FileNames) AddAttachment(ChatImages.FromFile(file));
+            AiInput.Focus();
+        }
+
+        void AiAttachRemove_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is ChatImage image)
+            {
+                _attachments.Remove(image);
+                UpdateAiAttachUi();
+            }
+        }
+
+        DragDropEffects DropEffectsFor(IDataObject data)
+        {
+            var files = ChatImages.ImageFilesFromDrop(data?.GetData(DataFormats.FileDrop));
+            if (files.Count == 0) return VisionReady() ? DragDropEffects.Copy : DragDropEffects.None;
+            if (!VisionReady())
+            {
+                var now = DateTime.Now;
+                if (now - _lastDropHint > TimeSpan.FromSeconds(3))
+                {
+                    _lastDropHint = now;
+                    AppendAi("Das aktuelle Modell unterstützt keine Bilder (Vision) — Drag & Drop blockiert.");
+                }
+                return DragDropEffects.None;
+            }
+            return DragDropEffects.Copy;
+        }
+
+        int AttachDroppedFiles(IDataObject data)
+        {
+            var files = ChatImages.ImageFilesFromDrop(data?.GetData(DataFormats.FileDrop));
+            if (files.Count == 0) return 0;
+            if (!VisionReady())
+            {
+                AppendAi($"Das aktuelle Modell unterstützt keine Bilder (Vision) — {files.Count} Datei(en) ignoriert.");
+                return 0;
+            }
+            foreach (var file in files) AddAttachment(ChatImages.FromFile(file));
+            return files.Count;
+        }
+
+        void AiInput_DragEnter(object sender, DragEventArgs e)
+        {
+            e.Effects = DropEffectsFor(e.Data);
+            e.Handled = true;
+        }
+
+        void AiInput_DragLeave(object sender, DragEventArgs e)
+        {
+            if (VisionReady()) e.Effects = DragDropEffects.None;
+        }
+
+        void AiInput_Drop(object sender, DragEventArgs e)
+        {
+            if (AttachDroppedFiles(e.Data) > 0) AiInput.Focus();
+            e.Handled = true;
+        }
+
+        bool PasteClipboardImage()
+        {
+            if (!VisionReady()) return false;
+            var image = ChatImages.FromClipboard();
+            if (image == null) return false;
+            AddAttachment(image);
+            return true;
         }
 
         async Task AiDetectAsync()
@@ -1208,6 +1467,7 @@ namespace NovaNote
             public string Id;
             public string Role;
             public string Content;
+            public List<string> Images;
             public string ToolName;
             public string Args;
             public string Result;
@@ -1217,8 +1477,7 @@ namespace NovaNote
 
         static string ChatAssetsFolder => Path.Combine(AppContext.BaseDirectory, "Assets", "Chat");
 
-        static string ChatUserDataFolder =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NovaNote", "WebView2");
+        static string ChatUserDataFolder => Path.Combine(SessionStore.DataDir, "WebView2");
 
         string NextChatId(string prefix) => prefix + "-" + (++_chatSeq);
 
@@ -1242,14 +1501,16 @@ namespace NovaNote
             PostChat(new { type = "setTheme", dark = ThemeService.IsDark });
         }
 
-        ChatEntry AddChatMessage(string role, string text)
+        ChatEntry AddChatMessage(string role, string text, List<string> images = null)
         {
-            var entry = new ChatEntry { Id = NextChatId(role), Role = role, Content = text };
+            var entry = new ChatEntry { Id = NextChatId(role), Role = role, Content = text, Images = images };
             _chatTranscript.Add(entry);
-            PostChat(new { type = "addMessage", id = entry.Id, role = role, content = text });
+            PostChat(new { type = "addMessage", id = entry.Id, role = role, content = text, images = images });
             if (_chatUnavailable && AiLog != null)
             {
-                AiLog.AppendText(AiLog.Text.Length > 0 ? "\n" + text : text);
+                string line = text;
+                if (images != null && images.Count > 0) line += $" [{images.Count} Bild/er]";
+                AiLog.AppendText(AiLog.Text.Length > 0 ? "\n" + line : line);
                 AiLog.ScrollToEnd();
             }
             return entry;
@@ -1346,7 +1607,7 @@ namespace NovaNote
                 }
                 else
                 {
-                    PostChat(new { type = "addMessage", id = e.Id, role = e.Role, content = e.Content });
+                    PostChat(new { type = "addMessage", id = e.Id, role = e.Role, content = e.Content, images = e.Images });
                 }
             }
         }
@@ -1413,7 +1674,7 @@ namespace NovaNote
             AppendAi("Code am Cursor eingefügt (Strg+Z macht es rückgängig).");
         }
 
-        string BuildAiSystemPrompt(AiModel model)
+        string BuildAiSystemPrompt(AiModel model, int imageCount = 0)
         {
             var view = ActiveView;
             string name = string.IsNullOrEmpty(view?.Path_) ? "neu (ohne Datei)" : System.IO.Path.GetFileName(view.Path_);
@@ -1425,6 +1686,8 @@ namespace NovaNote
             sb.Append($"Du bist der KI-Assistent für NovaNote. Aktive Datei: {name} — {lang}, {lines} Zeilen");
             if (sel > 0) sb.Append($", {sel} Zeichen ausgewählt");
             sb.Append(".\n");
+            if (imageCount > 0)
+                sb.Append($"Der Nutzer hat {imageCount} Bild(er) angehängt (image_url-Parts im content-Array); beschreibe sie bei Bedarf.\n");
             sb.Append("Der Dokumenttext wird nicht automatisch geschickt. Lies ihn bei Bedarf selbst über die Werkzeuge: ");
             sb.Append("get_document (kompletter Text oder Ausschnitt mit from_line/count), search_document (Suchtreffer), ");
             sb.Append("goto_line/select_lines (Navigation/Auswahl).\n");
@@ -1442,6 +1705,11 @@ namespace NovaNote
             const int keep = 12;
             if (rest.Count > keep) rest = rest.Skip(rest.Count - keep).ToList();
             while (rest.Count > 0 && rest[0].Role == "tool") rest.RemoveAt(0);
+
+            var lastImage = rest.LastOrDefault(m => m.Role == "user" && m.Images != null && m.Images.Count > 0);
+            foreach (var m in rest)
+                if (m != lastImage && m.Images != null) m.Images = null;
+
             _aiMessages.Clear();
             if (system != null) _aiMessages.Add(system);
             _aiMessages.AddRange(rest);
@@ -1454,6 +1722,7 @@ namespace NovaNote
             AiCancelButton.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
             AiScanItem.IsEnabled = !busy;
             if (busy) AiStatus.Text = "KI: denkt…";
+            UpdateAiAttachUi();
             PostChat(new { type = "setBusy", busy });
         }
 
@@ -1503,15 +1772,29 @@ namespace NovaNote
                 return;
             }
 
-            AddChatMessage("user", prompt);
+            if (_attachments.Count > 0 && !VisionReady())
+            {
+                AppendAi($"Das aktuelle Modell unterstützt keine Bilder (Vision) — {_attachments.Count} Anhang/Anhänge entfernt.");
+                ClearAttachments();
+            }
+            List<string> images = VisionReady() && _attachments.Count > 0
+                ? _attachments.Select(a => a.DataUri).ToList()
+                : null;
+            int imageCount = images?.Count ?? 0;
+
+            AddChatMessage("user", prompt, images);
             AiInput.Clear();
+            ClearAttachments();
             _aiPendingCall = null;
             _aiPendingChatId = null;
 
             TrimAiTranscript();
             _aiMessages.RemoveAll(m => m.Role == "system");
-            _aiMessages.Insert(0, new AiMessage { Role = "system", Content = BuildAiSystemPrompt(model) });
-            _aiMessages.Add(new AiMessage { Role = "user", Content = prompt });
+            _aiMessages.Insert(0, new AiMessage { Role = "system", Content = BuildAiSystemPrompt(model, imageCount) });
+            var userMsg = new AiMessage { Role = "user", Content = prompt, Images = images };
+            foreach (var m in _aiMessages)
+                if (m != userMsg && m.Images != null) m.Images = null;
+            _aiMessages.Add(userMsg);
 
             _aiCts = new CancellationTokenSource();
             await AiRunAsync(0);
@@ -1727,6 +2010,7 @@ namespace NovaNote
             _chatSeq = 0;
             PostChat(new { type = "clearChat" });
             AiLog.Clear();
+            ClearAttachments();
             AiInput.Focus();
         }
 
@@ -1737,6 +2021,10 @@ namespace NovaNote
                 if (Keyboard.Modifiers == ModifierKeys.Shift) return;
                 e.Handled = true;
                 _ = AiSendAsync();
+            }
+            else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control && PasteClipboardImage())
+            {
+                e.Handled = true;
             }
             else if (e.Key == Key.Escape && _aiBusy)
             {

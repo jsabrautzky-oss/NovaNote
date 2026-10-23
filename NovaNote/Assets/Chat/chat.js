@@ -202,11 +202,54 @@ jumpBtn.addEventListener('click', () => {
   jumpBtn.hidden = true;
 });
 
+function makeImages(images) {
+  const grid = document.createElement('div');
+  grid.className = 'imgs';
+  for (const src of images) {
+    const img = document.createElement('img');
+    img.className = 'thumb';
+    img.src = src;
+    img.alt = 'Angehängtes Bild';
+    img.loading = 'lazy';
+    img.addEventListener('click', () => openLightbox(src));
+    grid.appendChild(img);
+  }
+  return grid;
+}
+
+const overlay = document.createElement('div');
+overlay.className = 'lightbox';
+overlay.hidden = true;
+const bigImg = document.createElement('img');
+overlay.appendChild(bigImg);
+document.body.appendChild(overlay);
+overlay.addEventListener('click', () => {
+  overlay.hidden = true;
+  bigImg.src = '';
+});
+
+function openLightbox(src) {
+  bigImg.src = src;
+  overlay.hidden = false;
+}
+
+function closeLightbox() {
+  overlay.hidden = true;
+  bigImg.src = '';
+}
+
+function imageList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter(v => typeof v === 'string' && /^data:image\/[a-z0-9.+-]+;base64,/i.test(v));
+}
+
 function addMessage(ev) {
   const id = ev.id;
   const role = ev.role || 'assistant';
   const el = document.createElement('div');
   el.className = `msg ${role}`;
+  const images = imageList(ev.images);
+  if (images.length) el.appendChild(makeImages(images));
   const body = document.createElement('div');
   body.className = role === 'info' ? 'body' : 'body md';
   el.appendChild(body);
@@ -344,6 +387,7 @@ function clearChat() {
   lastRender.clear();
   stick = true;
   jumpBtn.hidden = true;
+  closeLightbox();
 }
 
 function handle(ev) {
@@ -366,6 +410,11 @@ if (wv) wv.addEventListener('message', e => handle(e.data));
 
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    if (!overlay.hidden) {
+      closeLightbox();
+      e.preventDefault();
+      return;
+    }
     send({ action: 'chatEscape' });
   }
 });

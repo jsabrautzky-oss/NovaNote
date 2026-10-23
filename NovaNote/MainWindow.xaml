@@ -60,6 +60,9 @@
                 <MenuItem x:Name="TabRestoreItem" Header="Zuletzt geschlossenen Tab öffnen" InputGestureText="Strg+Umschalt+T" IsEnabled="False" Click="TabRestore_Click"/>
                 <MenuItem x:Name="TabCloseAllItem" Header="Alle Tabs schließen" InputGestureText="Strg+Umschalt+W" Click="TabCloseAll_Click"/>
                 <Separator/>
+                <MenuItem x:Name="AskSaveOnCloseItem" Header="Vor dem Schließen nach Speichern fragen"
+                          IsCheckable="True" IsChecked="True" Click="AskSaveOnClose_Click"
+                          ToolTip="Ausgeschaltet verwirft „Beenden“ offene Änderungen ohne Dialog (praktisch zum Testen)."/>
                 <MenuItem x:Name="FileExitItem" Header="Beenden" InputGestureText="Alt+F4" Click="FileExit_Click"/>
             </MenuItem>
 
@@ -131,7 +134,7 @@
                     <MenuItem x:Name="CodeFormatItem" Header="Code formatieren" InputGestureText="Strg+Umschalt+F" IsEnabled="False" Click="CodeFormat_Click"/>
                     <MenuItem x:Name="PythonCompletionItem" Header="Python-Completion" InputGestureText="Strg+Leertaste" IsEnabled="False" Click="PythonCompletion_Click"/>
                     <Separator/>
-                    <MenuItem x:Name="LangNoneItem" Header="Keine" IsCheckable="True" Click="Language_Click" Tag="None"/>
+                    <MenuItem x:Name="LangNoneItem" Header="Text" IsCheckable="True" Click="Language_Click" Tag="None"/>
                     <MenuItem x:Name="LangJsonItem" Header="JSON" IsCheckable="True" Click="Language_Click" Tag="Json"/>
                     <MenuItem x:Name="LangXmlItem" Header="XML" IsCheckable="True" Click="Language_Click" Tag="Xml"/>
                     <MenuItem x:Name="LangHtmlItem" Header="HTML" IsCheckable="True" Click="Language_Click" Tag="Html"/>
@@ -208,15 +211,41 @@
                            Foreground="{DynamicResource SubtleTextBrush}" Margin="6,0" VerticalAlignment="Center"/>
                 <TextBlock x:Name="StatusSyntax" Grid.Column="2" Text=""
                            Foreground="{DynamicResource SubtleTextBrush}" Margin="6,0" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" MaxWidth="420"/>
-                <TextBlock x:Name="StatusLanguage" Grid.Column="3" Text="Automatisch" HorizontalAlignment="Right"
-                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
+                           TextTrimming="CharacterEllipsis" MaxWidth="420"
+                           Cursor="Hand" MouseLeftButtonUp="StatusSyntax_Click"
+                           ToolTip="Klick: Syntax-Check an/aus schalten"/>
+                <TextBlock x:Name="StatusLanguage" Grid.Column="3" Text="Text" HorizontalAlignment="Right"
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"
+                           Cursor="Hand" MouseLeftButtonUp="StatusLanguage_Click"
+                           ToolTip="Klick: Sprache wählen (manuelle Auswahl schaltet „Automatisch erkennen“ aus)"/>
                 <TextBlock x:Name="StatusEncoding" Grid.Column="4" Text="UTF-8"
-                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"
+                           Cursor="Hand" MouseLeftButtonUp="StatusEncoding_Click"
+                           ToolTip="Klick: Encoding wählen"/>
                 <TextBlock x:Name="StatusEol" Grid.Column="5" Text="Windows (CRLF)"
-                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"
+                           Cursor="Hand" MouseLeftButtonUp="StatusEol_Click"
+                           ToolTip="Klick: Zeilenende wählen"/>
                 <TextBlock x:Name="StatusZoom" Grid.Column="6" Text="100 %"
-                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"/>
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="12,0" VerticalAlignment="Center"
+                           Cursor="Hand" MouseLeftButtonUp="StatusZoom_Click"
+                           ToolTip="Klick: Schriftgröße mit Schieberegler ändern"/>
+                <Popup x:Name="ZoomPopup" PlacementTarget="{Binding ElementName=StatusZoom}"
+                       Placement="Top" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                    <Border Background="{DynamicResource PopupBgBrush}" BorderBrush="{DynamicResource PopupBorderBrush}"
+                            BorderThickness="1" CornerRadius="8" Padding="12,10" MinWidth="220">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.30" Color="#000000"/>
+                        </Border.Effect>
+                        <StackPanel Orientation="Horizontal">
+                            <Slider x:Name="ZoomSlider" Width="180" Minimum="40" Maximum="300"
+                                    TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center"
+                                    ValueChanged="ZoomSlider_Changed"/>
+                            <TextBlock x:Name="ZoomSliderValue" Text="100 %" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextBrush}" Margin="12,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Popup>
             </Grid>
         </Border>
         </Grid>
@@ -234,6 +263,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
@@ -272,13 +302,46 @@
                              Visibility="Collapsed"/>
                 </Grid>
 
-                <TextBox Grid.Row="3" x:Name="AiInput" AcceptsReturn="True" TextWrapping="Wrap"
-                         Margin="0,8,0,0" Padding="6,4" MinHeight="46" MaxHeight="120"
-                         VerticalScrollBarVisibility="Auto" PreviewKeyDown="AiInput_PreviewKeyDown"/>
+                <ItemsControl Grid.Row="3" x:Name="AiAttachStrip" Margin="0,6,0,0" Visibility="Collapsed">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,6,6" Padding="4" CornerRadius="4"
+                                    Background="{DynamicResource EditorBgBrush}"
+                                    BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <Grid Width="48" Height="48">
+                                        <TextBlock Text="Bild" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource SubtleTextBrush}"/>
+                                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                                    </Grid>
+                                    <TextBlock Text="{Binding FileName}" MaxWidth="110" Margin="6,0,0,0"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Note}"/>
+                                    <Button Content="&#10005;" Style="{StaticResource Btn}" MinWidth="24"
+                                            Margin="6,0,0,0" Click="AiAttachRemove_Click" Tag="{Binding}"
+                                            ToolTip="Bild entfernen"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                <WrapPanel Grid.Row="4" Margin="0,8,0,0">
+                <TextBox Grid.Row="4" x:Name="AiInput" AcceptsReturn="True" TextWrapping="Wrap"
+                         Margin="0,6,0,0" Padding="6,4" MinHeight="46" MaxHeight="120"
+                         VerticalScrollBarVisibility="Auto" AllowDrop="True"
+                         DragEnter="AiInput_DragEnter" DragLeave="AiInput_DragLeave" Drop="AiInput_Drop"
+                         PreviewKeyDown="AiInput_PreviewKeyDown"/>
+
+                <WrapPanel Grid.Row="5" Margin="0,8,0,0">
+                    <Button x:Name="AiAttachButton" Style="{StaticResource Btn}" Content="+" MinWidth="34"
+                            ToolTip="Bild anhängen" Click="AiAttach_Click"/>
                     <Button x:Name="AiSendButton" Style="{StaticResource BtnAccent}" Content="Senden"
-                            MinWidth="90" Click="AiSend_Click"/>
+                            MinWidth="90" Margin="6,0,0,0" Click="AiSend_Click"/>
                     <Button x:Name="AiCancelButton" Style="{StaticResource Btn}" Content="Abbrechen"
                             MinWidth="80" Margin="6,0,0,0" Visibility="Collapsed" Click="AiCancel_Click"/>
                     <Button x:Name="AiClearButton" Style="{StaticResource Btn}" Content="Verlauf löschen"

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.0
+Der KI-Chat kann Bilder (Vision) — nur wenn das aktive Modell Bilder versteht. Die Statusleiste ist per Klick bedienbar, Kontext-Menüs und Schieberegler folgen dem Theme (Dark Mode), und beim Schließen wird jeder ungespeicherte Tab einzeln mit Fokus abgefragt.
+
+### Neue Features
+- Bildanhänge im Chat: `+`-Button mit `OpenFileDialog` (Mehrfachauswahl), Drag & Drop von Bilddateien auf das Eingabefeld und `Strg+V` für Screenshots aus der Zwischenablage
+- Vorschau-Leiste über der Eingabe: Thumbnail-Chips (48×48) mit Dateiname und `✕`, geleert nach dem Senden
+- Vision-Erkennung: Server-Metadaten (`vision`/`supports_vision`/`multimodal`, `capabilities`/`modalities`, `projector`, `vision_*`-Zahlen in `metadata`/`model_info`) plus Modellnamen-Heuristik (`vision`, `-vl`, `llava`, `pixtral`, `minicpm-v`, `moondream`, `gemma-3`/`gemma3`, `gpt-4o`, `claude-3`, `gemini`, `glm-4v`, `internvl`, `phi-vision`)
+- Manueller Override: „Vision erzwingen“ im KI-Einstellungsdialog pro Modell (`VisionOverride`); Statuszeile zeigt „Vision Ja (manuell)“
+- OpenAI-kompatibles Payload: User-Nachrichten mit Bildern senden `content` als Array (`{"type":"text"}` + `{"type":"image_url","image_url":{"url":"data:image/…;base64,…"}}`; ohne Bilder bleibt `content` ein String) — identisch für LM Studio, Ollama und llama-server
+- Bilder in den Chat-Bubbles: gerenderte Thumbnails (`max-height: 180px`, abgerundet), Klick öffnet eine Lightbox (`Escape` schließt sie)
+- `ChatImages.cs`: Base64-Data-URI-Erzeugung, Kantenlänge > 2048 px wird auf 2048 px skaliert und als JPEG kodiert, > 6 MB wird neu kodiert, maximal 6 Bilder pro Nachricht
+
+### Geändert
+- Ohne Vision: `+`-Button deaktiviert mit Tooltip „Das aktuelle Modell unterstützt keine Bilder (Vision)“, `AiInput.AllowDrop` false und Drag & Drop blockiert (kurzer Hinweis im Chat)
+- Die Sammel-Abfrage „Alle Tabs schließen“ beim Fenster-Schließen ist entfernt; stattdessen fragt `MainWindow_Closing` jeden ungespeicherten Tab einzeln ab (`PromptDirtyFocused` aktiviert den Tab vorher, damit der Dialog den richtigen Tab zeigt). `Prefs.AskSaveOnClose` ist wieder aktiviert (per Tab „Speichern?/Verwerfen/Abbrechen“); ausgeschaltet verwirft „Beenden“ Änderungen ohne Nachfrage
+- Die Sprache „Keine“ heißt jetzt „Text“ und wird wie alle anderen Sprachen in der Statusleiste angezeigt (`DocLanguages.DisplayName(None)` = „Text“)
+- Klick auf die Sprache in der Statusleiste öffnet ein Menü mit allen Sprachen und „Automatisch erkennen“ (Context-Menü über `StatusLanguage`, öffnet nach oben); eine manuelle Sprachwahl schaltet `Prefs.LanguageAuto` aus, die Statuszeile zeigt dann „JSON“ statt „JSON · Automatik“
+- Kontext-Menüs (Sprachmenü, Rechtsklick-Menü) sind jetzt vollständig gethemt: eigener `Style` für `ContextMenu` mit `PopupBgBrush`/`PopupBorderBrush`/`TextBrush` und abgerundetem Popup mit Schatten — im Dark Mode ist der Hintergrund dunkel (#2B2B2B) und der Text hell (#FFFFFF)
+- Die ganze Statusleiste ist per Klick bedienbar: `StatusSyntax` schaltet Syntax-Check an/aus, `StatusEncoding` und `StatusEol` öffnen Menüs (Encoding/Zeilenende), `StatusZoom` öffnet einen gethemten Schieberegler (`ZoomPopup` mit `ZoomSlider`, 40–300 %, Wert als Text daneben); `Theme/Controls.xaml` hat dazu einen dunklen `Slider`-Style (Accent-Thumb, `InputBgBrush`-Track)
+- Systemprompt erwähnt angehängte Bilder; Bilder aus älteren Nachrichten werden im Verlauf entfernt, damit jeder Request nur die aktuellen Bilder mitschickt
+- CSP des Chat-Frontends lässt `img-src 'self' data:`; der Sanitizer entfernt weiterhin Modell-HTML, angehängte Bilder werden per JS gesetzt
+
+### Paket
+- Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.6.0-full.nupkg`, Delta von 0.5.2 (`NovaNote-0.6.0-delta.nupkg`)
+
 ## 0.5.2
 Das KI-Chat-Panel rendert Antworten jetzt in WebView2 (HTML/JS) statt als nackter Text.
 

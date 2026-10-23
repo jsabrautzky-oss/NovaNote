@@ -130,7 +130,9 @@ namespace NovaNote
                         Name = m.DisplayName,
                         Id = m.Id,
                         Context = m.ContextLength.ToString(),
-                        Vision = m.Vision ? "Ja" : "Nein",
+                        Vision = m.VisionOverride.HasValue
+                            ? (m.VisionEnabled ? "Ja (manuell)" : "Nein (manuell)")
+                            : (m.Vision ? "Ja" : "Nein"),
                         Tools = m.SupportsTools ? "Ja" : "Nein",
                         Active = string.Equals(m.Id, _current.ActiveModelId, StringComparison.OrdinalIgnoreCase),
                         Missing = !m.Available
@@ -145,9 +147,29 @@ namespace NovaNote
 
         void UpdateButtons()
         {
-            bool has = ModelList.SelectedItem is AiModelRow;
-            SetActiveButton.IsEnabled = has && _current != null;
-            RemoveButton.IsEnabled = has && _current != null;
+            var row = ModelList.SelectedItem as AiModelRow;
+            bool has = row != null && _current != null;
+            SetActiveButton.IsEnabled = has;
+            RemoveButton.IsEnabled = has;
+            var model = _current?.Models.FirstOrDefault(m => m.Id == row?.Id);
+            _loading = true;
+            VisionBox.IsChecked = model?.VisionOverride == true;
+            VisionBox.IsEnabled = has;
+            _loading = false;
+        }
+
+        void VisionBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _current == null) return;
+            var row = ModelList.SelectedItem as AiModelRow;
+            if (row == null) return;
+            var model = _current.Models.FirstOrDefault(m => m.Id == row.Id);
+            if (model == null) return;
+            model.VisionOverride = VisionBox.IsChecked == true ? true : (bool?)null;
+            RefreshModels();
+            StatusText.Text = VisionBox.IsChecked == true
+                ? $"Vision für \"{row.Name}\" erzwungen — Bilder im Chat erlaubt."
+                : $"Vision für \"{row.Name}\" folgt wieder der Erkennung (Metadaten oder Modellname).";
         }
 
         async void Scan_Click(object sender, RoutedEventArgs e)
@@ -222,6 +244,7 @@ namespace NovaNote
                 Name = NewNameBox.Text.Trim(),
                 ContextLength = ctx,
                 Vision = NewVisionBox.IsChecked == true,
+                VisionOverride = NewVisionBox.IsChecked == true ? true : (bool?)null,
                 SupportsTools = NewToolsBox.IsChecked == true,
                 Manual = true,
                 Available = true

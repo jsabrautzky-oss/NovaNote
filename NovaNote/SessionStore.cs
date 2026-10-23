@@ -8,6 +8,7 @@ namespace NovaNote
     public class AppPrefs
     {
         public bool RestoreSession { get; set; } = true;
+        public bool AskSaveOnClose { get; set; } = true;
         public bool MultiTab { get; set; } = true;
         public bool LanguageAuto { get; set; } = true;
         public bool ShowLineNumbers { get; set; } = true;
@@ -55,8 +56,18 @@ namespace NovaNote
 
     public static class SessionStore
     {
-        static string Dir => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NovaNote");
+        public static string DataDir
+        {
+            get
+            {
+                var testDir = Environment.GetEnvironmentVariable("NOVANOTE_DIR");
+                if (!string.IsNullOrWhiteSpace(testDir)) return testDir;
+                return Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NovaNote");
+            }
+        }
+
+        static string Dir => DataDir;
 
         static string PrefPath => Path.Combine(Dir, "einstellungen.json");
         static string SessionPath => Path.Combine(Dir, "sitzung.json");

@@ -40,6 +40,7 @@ namespace NovaNote
     {
         public string Role { get; set; } = "user";
         public string Content { get; set; } = "";
+        public List<string> Images { get; set; } = null;
         public string ToolCallId { get; set; } = null;
         public List<AiToolCall> ToolCalls { get; set; } = null;
     }
@@ -184,7 +185,7 @@ namespace NovaNote
             }
 
             int shown = 0;
-            foreach (var info in map.Values.Where(m => m.ContextLength <= 0 || !m.SupportsTools).ToList())
+            foreach (var info in map.Values.Where(m => m.ContextLength <= 0 || !m.SupportsTools || !m.Vision).ToList())
             {
                 if (shown >= 20) break;
                 shown++;
@@ -252,14 +253,19 @@ namespace NovaNote
             return 0;
         }
 
+        static readonly string[] VisionNames =
+        {
+            "vision", "-vl", "vl-", "llava", "pixtral", "minicpm-v", "moondream",
+            "gemma-3", "gemma3", "gpt-4o", "gpt-4.1", "claude-3", "gemini",
+            "glm-4v", "internvl", "phi-vision", "c4ai", "COMMAND-R-VISION"
+        };
+
         public static bool IsVisionName(string s)
         {
             if (string.IsNullOrEmpty(s)) return false;
-            return s.Contains("vision", StringComparison.OrdinalIgnoreCase) ||
-                   s.Contains("llava", StringComparison.OrdinalIgnoreCase) ||
-                   s.Contains("-vl", StringComparison.OrdinalIgnoreCase) ||
-                   s.Contains("vl-", StringComparison.OrdinalIgnoreCase) ||
-                   s.Contains("minicpm-v", StringComparison.OrdinalIgnoreCase);
+            foreach (var token in VisionNames)
+                if (s.Contains(token, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         static bool ReadBool(JsonElement e, string key, out bool value)
@@ -281,9 +287,41 @@ namespace NovaNote
 
         static bool ReadVision(JsonElement e, string id)
         {
-            if (ReadBool(e, "vision", out bool flag)) return flag;
+            foreach (var key in new[] { "vision", "supports_vision", "vision_supported", "multimodal" })
+                if (ReadBool(e, key, out bool flag) && flag) return true;
+            if (HasProjector(e)) return true;
             if (HasCapability(e, "vision") || HasCapability(e, "image") || HasCapability(e, "multimodal")) return true;
+            if (HasVisionNumber(e)) return true;
+            foreach (var key in new[] { "metadata", "model_info", "details", "quantize_stats" })
+            {
+                if (e.TryGetProperty(key, out var nested) && nested.ValueKind == JsonValueKind.Object &&
+                    ReadVision(nested, id))
+                    return true;
+            }
             return IsVisionName(id);
+        }
+
+        static bool HasProjector(JsonElement e)
+        {
+            if (e.TryGetProperty("projector", out var v))
+            {
+                if (v.ValueKind == JsonValueKind.True) return true;
+                if (v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString())) return true;
+                if (v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out int n) && n > 0) return true;
+            }
+            return false;
+        }
+
+        static bool HasVisionNumber(JsonElement e)
+        {
+            if (e.ValueKind != JsonValueKind.Object) return false;
+            foreach (var p in e.EnumerateObject())
+            {
+                if (!p.Name.Contains("vision", StringComparison.OrdinalIgnoreCase)) continue;
+                if (p.Value.ValueKind == JsonValueKind.True) return true;
+                if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int n) && n > 0) return true;
+            }
+            return false;
         }
 
         static bool ReadTools(JsonElement e, string id)
@@ -575,10 +613,20 @@ namespace NovaNote
 
         static ChatMessageDto ToDto(AiMessage m)
         {
+            object content = m.Content;
+            if (m.Images != null && m.Images.Count > 0)
+            {
+                var parts = new List<ContentPartDto>();
+                if (!string.IsNullOrEmpty(m.Content)) parts.Add(new ContentPartDto { Type = "text", Text = m.Content });
+                foreach (var img in m.Images)
+                    parts.Add(new ContentPartDto { Type = "image_url", ImageUrl = new ImageUrlDto { Url = img } });
+                content = parts;
+            }
+
             var dto = new ChatMessageDto
             {
                 Role = m.Role,
-                Content = m.Content,
+                Content = content,
                 ToolCallId = m.ToolCallId
             };
             if (m.ToolCalls != null && m.ToolCalls.Count > 0)
@@ -742,9 +790,21 @@ namespace NovaNote
         class ChatMessageDto
         {
             [JsonPropertyName("role")] public string Role { get; set; }
-            [JsonPropertyName("content")] public string Content { get; set; }
+            [JsonPropertyName("content")] public object Content { get; set; }
             [JsonPropertyName("tool_calls")] public List<ToolCallDto> ToolCalls { get; set; }
             [JsonPropertyName("tool_call_id")] public string ToolCallId { get; set; }
+        }
+
+        class ContentPartDto
+        {
+            [JsonPropertyName("type")] public string Type { get; set; }
+            [JsonPropertyName("text")] public string Text { get; set; }
+            [JsonPropertyName("image_url")] public ImageUrlDto ImageUrl { get; set; }
+        }
+
+        class ImageUrlDto
+        {
+            [JsonPropertyName("url")] public string Url { get; set; }
         }
 
         class ToolDto

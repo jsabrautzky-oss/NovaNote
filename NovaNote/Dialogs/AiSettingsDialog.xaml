@@ -129,6 +129,9 @@
                         MinWidth="110" Margin="8,0,0,0" IsEnabled="False" Click="SetActive_Click"/>
                 <Button x:Name="RemoveButton" Style="{StaticResource Btn}" Content="Entfernen"
                         MinWidth="84" Margin="8,0,0,0" IsEnabled="False" Click="Remove_Click"/>
+                <CheckBox x:Name="VisionBox" Content="Vision erzwingen" Margin="12,0,0,0" VerticalAlignment="Center"
+                          IsEnabled="False" Click="VisionBox_Click"
+                          ToolTip="Angehakt: Bilder sind für dieses Modell erlaubt, auch wenn Server oder Namensheuristik kein Vision melden. Abgehakt: automatisch erkennen."/>
             </StackPanel>
 
             <GroupBox Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2" Header="Modell manuell hinzufügen" Margin="0,10,0,0">

@@ -23,6 +23,7 @@ namespace NovaNote
         public string Name { get; set; } = "";
         public int ContextLength { get; set; } = 4096;
         public bool Vision { get; set; }
+        public bool? VisionOverride { get; set; }
         public bool SupportsTools { get; set; }
         public bool Manual { get; set; }
         public bool Available { get; set; } = true;
@@ -30,11 +31,15 @@ namespace NovaNote
         [JsonIgnore]
         public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Id : Name;
 
+        [JsonIgnore]
+        public bool VisionEnabled => VisionOverride ?? Vision;
+
         public AiModel Clone() => new AiModel        {
             Id = Id,
             Name = Name,
             ContextLength = ContextLength,
             Vision = Vision,
+            VisionOverride = VisionOverride,
             SupportsTools = SupportsTools,
             Manual = Manual,
             Available = Available
@@ -102,8 +107,7 @@ namespace NovaNote
 
     public static class AiStore
     {
-        static string Dir => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NovaNote");
+        static string Dir => SessionStore.DataDir;
 
         static string StatePath => Path.Combine(Dir, "ki.json");
 
@@ -173,6 +177,8 @@ namespace NovaNote
         public static AiProvider ActiveProvider => State.ActiveProvider;
 
         public static AiModel ActiveModel => ActiveProvider?.ActiveModel;
+
+        public static bool SupportsVision(AiModel model) => model != null && model.VisionEnabled;
 
         public static string NewId(string prefix)
         {

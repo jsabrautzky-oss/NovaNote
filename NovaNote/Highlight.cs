@@ -90,7 +90,7 @@ namespace NovaNote
                 case DocLanguage.Python: return "Python";
                 case DocLanguage.CSharp: return "C#";
                 case DocLanguage.Yaml: return "YAML";
-                default: return "";
+                default: return "Text";
             }
         }
     }

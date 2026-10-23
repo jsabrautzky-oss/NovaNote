@@ -2,11 +2,18 @@
 
 **Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-Aktuelle Version: **0.5.2**  
-GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.5.2
+Aktuelle Version: **0.6.0**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.6.0
 
-## Neu in 0.5.1
-- Bugfix: „Update prüfen → Setup herunterladen“ startet das Setup jetzt korrekt (der Download hielt die Datei beim Start offen)
+## Neu in 0.6.0
+- **Bilder im Chat (Vision)**: `+`-Buttonanhänge (Mehrfachauswahl), Drag & Drop auf das Eingabefeld und `Strg+V` für Screenshots aus der Zwischenablage
+- **Vision-Erkennung**: Server-Metadaten (`vision`, `capabilities`/`modalities`, `projector`), Modellnamen-Heuristik (`qwen…-vl`, `llava`, `pixtral`, `gemma-3`, `minicpm-v`, `moondream`, `gpt-4o`, `claude-3`, `gemini`, …) und manueller „Vision erzwingen“-Schalter in den KI-Einstellungen
+- Ohne Vision ist der `+`-Button deaktiviert (Tooltip erklärt es) und Drag & Drop blockiert; angehängte Bilder werden nur dann gesendet
+- Anhänge als Thumbnail-Chips mit `✕` vor dem Senden; im Chat als Vorschaubilder mit Lightbox (Klick vergrößert, `Escape` schließt)
+- Sprache: „Keine“ heißt jetzt „Text“ und erscheint in der Statusleiste; ein Klick auf die Sprache öffnet ein Menü mit allen Sprachen, und eine manuelle Auswahl schaltet „Automatisch erkennen“ aus
+- Beim Schließen fragt NovaNote jeden ungespeicherten Tab einzeln ab („Speichern?/Verwerfen/Abbrechen“); der abgefragte Tab bekommt vorher den Fokus. Die Sammel-Abfrage „Alle Tabs schließen“ gibt es nicht mehr. „Datei → Vor dem Schließen nach Speichern fragen“ schaltet die Abfrage aus (dann werden Änderungen verworfen)
+- Große Bilder werden speicherschonend auf 2048 px skaliert und als JPEG gesendet; maximal 6 Bilder pro Nachricht, Bilder aus älteren Nachrichten werden im Verlauf entfernt
+- Die ganze Statusleiste ist per Klick bedienbar: Syntax-Check an/aus, Encoding, Zeilenende und Schriftgröße (Schieberegler 40–300 %); Menüs und Regler folgen dem Theme (Dark Mode: dunkler Popup, heller Text)
 
 ## Neu in 0.5.2
 - **Chat als WebView2-Ansicht** statt reinem Text: Markdown mit Überschriften, Listen, Tabellen und Syntax-Highlighting, Antworten werden live gestreamt
@@ -16,6 +23,9 @@ GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.5.2
 - Chat-Frontend liegt lokal im Programm (`Assets\Chat\`, mit mitgeliefertem `marked`/`highlight`) — kein CDN, kein Internet nötig
 - Panelbreite: ohne gespeicherten Wert startet das KI-Panel mit halber Fensterbreite; nach dem Zerren am Trenner bleibt die Breite gespeichert
 - Ohne WebView2-Runtime fallbackt der Chat auf die einfache Textausgabe; `WebView2Loader.dll` ist im Paket enthalten
+
+## Neu in 0.5.1
+- Bugfix: „Update prüfen → Setup herunterladen“ startet das Setup jetzt korrekt (der Download hielt die Datei beim Start offen)
 
 ## Neu in 0.5.0
 - **KI-Assistent im rechten Chat-Panel** (optional, standardmäßig geschlossen): Antworten, Suche, Zusammenfassung und Editor-Aktionen
@@ -29,6 +39,7 @@ GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.5.2
 - Dateien bearbeiten: `.txt`, `.md`, `.markdown`, `.py`, `.pyw`, `.cs`, `.csx`, `.yaml`, `.yml`, `.json`, `.jsonc`, `.json5`, `.xml`, `.xsl`, `.xhtml`, `.svg`, `.html`, `.htm`, `.css`, `.js`, `.mjs`, `.ts`, `.cpp`, `.c`, `.h`, `.hpp`
 - Syntax-Check mit roter Wellenlinie und `F4` für den nächsten Fehler
 - Rechtsklick-Menü: Aktionen erscheinen nur, wenn sie passen (Kopieren/Ausschneiden nur mit Auswahl, Einfügen nur mit Zwischenablage, JSON-/Code-Formatierung, Python-Completion, Markdown-Vorschau je nach Sprache)
+- Statusleiste: alles per Klick änderbar — Sprache (Menü, manuelle Auswahl schaltet „Automatisch erkennen“ aus), Encoding (UTF-8, UTF-8 mit BOM, UTF-16 LE/BE, ANSI), Zeilenende (Windows/Unix/Macintosh), Schriftgröße (Schieberegler 40–300 %) und Syntax-Check (Klick schaltet an/aus). Menüs und Regler folgen dem Theme (Dark Mode: dunkler Popup-Hintergrund, heller Text)
 - Code-Folding (abschaltbar) und Whitespace-Anzeige
 - Mehrfach-Tabs und Tabs in eigene Fenster lösen
 - Session-Wiederherstellung: Fenster und Tabs beim nächsten Start wieder öffnen
@@ -58,13 +69,16 @@ Ohne KI nutzt NovaNote nur den Editor — das Panel ist zu, es laufen keine Anfr
 8. Der API-Key wird verschlüsselt (DPAPI, aktueller Benutzer) in `%APPDATA%\NovaNote\ki.json` gespeichert.
 9. Manche Server (z. B. `llama-server`) melden Tool-Support nicht in `/v1/models`. NovaNote versucht Tool-Aufrufe trotzdem
    und setzt das „Tools“-Flag im Panel automatisch, sobald ein Aufruf akzeptiert wurde.
+10. Bilder: Wenn das aktive Modell Vision unterstützt, hängst du über den `+`-Button Bilder an (auch Drag & Drop auf das
+    Eingabefeld oder `Strg+V` für Screenshots). Ohne Vision ist der Button deaktiviert und Drag & Drop blockiert; unbekannte
+    Custom-Modelle kannst du in „KI → KI-Einstellungen…“ mit „Vision erzwingen“ freigeben.
 
 Die KI ist rein optional: ohne laufenden Server passiert nichts, NovaNote bleibt ein lokaler Editor.
 
 ## Unterstützte Sprachen
 | Sprache | Syntax-Highlighting | Syntax-Check | Code-Folding | Hinweis |
 |---|---:|---:|---:|---|
-| Plain Text | ❌ | ❌ | ❌ | kein Sprachmodus |
+| Text | ❌ | ❌ | ❌ | kein Sprachmodus (ohne Endung) |
 | Markdown | ✓ | ❌ | ❌ | Live-Vorschau für `.md`/`.markdown` mit MdXaml |
 | Python | ✓ | ✓ | ❌ | Live-Syntax/Diagnosen über LSP-Pull/CLI, `.` / `Strg+Leertaste` für Completion, Formatierung |
 | C# | ✓ | ✓ | ✓ | Syntax-Check mit Roslyn, Formatierung mit `Strg+Umschalt+F` |
@@ -103,7 +117,7 @@ Hinweis: Weitere Sprachen sollen später folgen.
 4. Optional: `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` per Doppelklick mit NovaNote öffnen.
 
 Direkter Installer-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.2/NovaNote-win-Setup.exe
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.0/NovaNote-win-Setup.exe
 
 ## Installation als Portable-Version
 1. `NovaNote-win-Portable.zip` von der GitHub-Release-Seite herunterladen.
@@ -111,7 +125,7 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.2/NovaNote-wi
 3. `NovaNote.exe` starten.
 
 Direkter Portable-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.2/NovaNote-win-Portable.zip
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.0/NovaNote-win-Portable.zip
 
 ## Updates
 - NovaNote kann beim Start automatisch prüfen, ob auf GitHub ein neuer Release mit `NovaNote-win-Setup.exe` vorhanden ist.

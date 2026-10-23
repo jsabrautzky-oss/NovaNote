@@ -266,7 +266,7 @@ namespace NovaNote
         {
             try
             {
-                var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NovaNote");
+                var dir = SessionStore.DataDir;
                 Directory.CreateDirectory(dir);
                 File.AppendAllText(Path.Combine(dir, "update.log"), $"{DateTime.Now:O} {message}\n");
             }
