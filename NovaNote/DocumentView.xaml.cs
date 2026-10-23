@@ -497,6 +497,19 @@ namespace NovaNote
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        public void InsertAtCaret(string text)
+        {
+            string body = Norm(text ?? "");
+            if (body.Length == 0) return;
+            int at = SelLength > 0 ? SelStart : Editor.CaretOffset;
+            int len = SelLength > 0 ? SelLength : 0;
+            ReplaceRange(at, len, body);
+            Editor.CaretOffset = at + body.Length;
+            ScrollToIndex(Editor.CaretOffset);
+            DetectLanguage();
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         public List<(int line, int col, int length)> FindAll(string term, bool matchCase, bool whole, int max)
         {
             var result = new List<(int, int, int)>();

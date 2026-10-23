@@ -2,11 +2,20 @@
 
 **Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-Aktuelle Version: **0.5.1**  
-GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.5.1
+Aktuelle Version: **0.5.2**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.5.2
 
 ## Neu in 0.5.1
 - Bugfix: „Update prüfen → Setup herunterladen“ startet das Setup jetzt korrekt (der Download hielt die Datei beim Start offen)
+
+## Neu in 0.5.2
+- **Chat als WebView2-Ansicht** statt reinem Text: Markdown mit Überschriften, Listen, Tabellen und Syntax-Highlighting, Antworten werden live gestreamt
+- **Tool-Calls als aufklappbare Karten** mit Status (⏳ Läuft, 🟡 Warten auf Bestätigung, ✅ Abgeschlossen, ❌ Fehler, 🚫 Verwerpen), formatierten Arguments und Ergebnis
+- **Bestätigen/Verwerfen direkt im Tool-Card** statt eigener Buttons; Codeblöcke bekommen „Kopieren“ und „In Editor einfügen“ (am Cursor)
+- Eingabefeld und Buttons (Senden, Abbrechen, Verlauf löschen) bleiben native WPF-Controls; Chat-Farben folgen dem Theme
+- Chat-Frontend liegt lokal im Programm (`Assets\Chat\`, mit mitgeliefertem `marked`/`highlight`) — kein CDN, kein Internet nötig
+- Panelbreite: ohne gespeicherten Wert startet das KI-Panel mit halber Fensterbreite; nach dem Zerren am Trenner bleibt die Breite gespeichert
+- Ohne WebView2-Runtime fallbackt der Chat auf die einfache Textausgabe; `WebView2Loader.dll` ist im Paket enthalten
 
 ## Neu in 0.5.0
 - **KI-Assistent im rechten Chat-Panel** (optional, standardmäßig geschlossen): Antworten, Suche, Zusammenfassung und Editor-Aktionen
@@ -39,14 +48,15 @@ Ohne KI nutzt NovaNote nur den Editor — das Panel ist zu, es laufen keine Anfr
    `llama-server` auf einem anderen Rechner (z. B. `http://192.168.178.81:8081/v1`). Die Adresse ist frei editierbar.
 2. NovaNote: Menü „KI → KI-Einstellungen…“ → Anbieter auswählen, Adresse prüfen, dann „Modelle scannen“.
 3. Panel öffnen über „KI → KI-Panel“ oder `Strg+Alt+K`; aktives Modell und Anbieter stehen als Dropdown im Panel.
-   Die Breite bleibt nach dem Zerren am Trenner gespeichert.
+   Ohne gespeicherten Wert ist das Panel halb so breit wie das Fenster; nach dem Zerren am Trenner bleibt die Breite gespeichert.
 4. Die KI bekommt nur Dateiinfos (Name, Sprache, Zeilenzahl) als Systemprompt. Sie entscheidet selbst, ob sie über
    `get_document`/`search_document` im Dokument liest, und antwortet dann in Text oder ruft ein Bearbeitungs-Werkzeug auf.
-5. Editor-Aktionen werden standardmäßig erst nach „Übernehmen“ ausgeführt; „KI → Aktionen automatisch anwenden“
+5. Editor-Aktionen werden standardmäßig erst nach „Bestätigen“ im Tool-Card ausgeführt; „KI → Aktionen automatisch anwenden“
    führt sie sofort aus. `Strg+Z` macht übernommene Änderungen rückgängig.
-6. Modelle ohne native Tool-Aufrufe nutzen ein Text-Format (```nova```-Block), das NovaNote ebenfalls ausführt.
-7. Der API-Key wird verschlüsselt (DPAPI, aktueller Benutzer) in `%APPDATA%\NovaNote\ki.json` gespeichert.
-8. Manche Server (z. B. `llama-server`) melden Tool-Support nicht in `/v1/models`. NovaNote versucht Tool-Aufrufe trotzdem
+6. Codeblöcke in der Antwort haben „Kopieren“ und „In Editor einfügen“; Einfügen setzt den Code am Cursor (bestehende Auswahl wird ersetzt).
+7. Modelle ohne native Tool-Aufrufe nutzen ein Text-Format (```nova```-Block), das NovaNote ebenfalls ausführt.
+8. Der API-Key wird verschlüsselt (DPAPI, aktueller Benutzer) in `%APPDATA%\NovaNote\ki.json` gespeichert.
+9. Manche Server (z. B. `llama-server`) melden Tool-Support nicht in `/v1/models`. NovaNote versucht Tool-Aufrufe trotzdem
    und setzt das „Tools“-Flag im Panel automatisch, sobald ein Aufruf akzeptiert wurde.
 
 Die KI ist rein optional: ohne laufenden Server passiert nichts, NovaNote bleibt ein lokaler Editor.
@@ -93,7 +103,7 @@ Hinweis: Weitere Sprachen sollen später folgen.
 4. Optional: `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` per Doppelklick mit NovaNote öffnen.
 
 Direkter Installer-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.1/NovaNote-win-Setup.exe
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.2/NovaNote-win-Setup.exe
 
 ## Installation als Portable-Version
 1. `NovaNote-win-Portable.zip` von der GitHub-Release-Seite herunterladen.
@@ -101,7 +111,7 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.1/NovaNote-wi
 3. `NovaNote.exe` starten.
 
 Direkter Portable-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.1/NovaNote-win-Portable.zip
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.2/NovaNote-win-Portable.zip
 
 ## Updates
 - NovaNote kann beim Start automatisch prüfen, ob auf GitHub ein neuer Release mit `NovaNote-win-Setup.exe` vorhanden ist.
@@ -115,7 +125,9 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.5.1/NovaNote-wi
 - Genügend Speicherplatz für die App und entpackte Portable-Version
 - Kein Administrator für die Benutzer-Installation nötig
 - Kein separate .NET-Installation nötig
+- WebView2-Runtime (in Chrome/Edge 90+ enthalten) für das Chat-Panel; ohne Runtime läuft der Chat als Textausgabe
 - Für die KI: ein lokaler OpenAI-kompatibler Server (LM Studio, Ollama oder `llama-server`)
+- Für das Chat-Panel: WebView2-Runtime (auf Windows 11 dabei, auf Windows 10 meist installiert); ohne Runtime zeigt der Chat die einfache Textausgabe
 
 ## Systeme
 NovaNote läuft für:

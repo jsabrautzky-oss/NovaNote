@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -57,6 +58,7 @@ namespace NovaNote
         public const string OllamaBaseUrl = "http://localhost:11434/v1";
 
         static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+        static readonly HttpClient ChatHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(300) };
 
         static readonly JsonSerializerOptions ReqOpt = new JsonSerializerOptions
         {
@@ -362,6 +364,168 @@ namespace NovaNote
             }
         }
 
+        public static async Task<AiReply> ChatStreamAsync(
+            AiProvider provider, AiModel model, List<AiMessage> messages, List<AiToolDef> tools,
+            CancellationToken ct, Action<string> onChunk)
+        {
+            var reply = new AiReply();
+            if (provider == null) { reply.Error = "Kein Anbieter gewählt."; return reply; }
+            if (model == null) { reply.Error = "Kein Modell gewählt. KI → Modelle scannen."; return reply; }
+
+            string url = OpenAiBase(provider.BaseUrl) + "/chat/completions";
+            bool useTools = tools != null && tools.Count > 0;
+            HttpResponseMessage response = null;
+            try
+            {
+                response = await PostChatAsync(url, provider.ApiKey,
+                    BuildRequest(model, messages, useTools ? tools : null, true), ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    int code = (int)response.StatusCode;
+                    string body = await SafeTextAsync(response);
+                    response.Dispose();
+                    response = null;
+
+                    if (useTools)
+                    {
+                        using var retry = await PostChatAsync(url, provider.ApiKey,
+                            BuildRequest(model, messages, null, false), ct);
+                        if (retry.IsSuccessStatusCode)
+                        {
+                            ParseReply(await SafeTextAsync(retry), reply);
+                            reply.ToolsAccepted = false;
+                            AppendFallbackHint(messages);
+                            reply.ToolCalls = ParseFallbackToolCalls(reply.Content);
+                            if (!string.IsNullOrEmpty(reply.Content)) onChunk?.Invoke(reply.Content);
+                            return reply;
+                        }
+                        reply.Error = $"HTTP {(int)retry.StatusCode}: {Trim(await SafeTextAsync(retry))}";
+                        return reply;
+                    }
+
+                    reply.Error = $"HTTP {code}: {Trim(body)}";
+                    return reply;
+                }
+
+                var content = new StringBuilder();
+                var partial = new Dictionary<int, AiToolCall>();
+                var order = new List<int>();
+
+                using (response)
+                using (var stream = await response.Content.ReadAsStreamAsync(ct))
+                using (var reader = new StreamReader(stream, Encoding.UTF8))
+                {
+                    string line;
+                    while (!ct.IsCancellationRequested && (line = await reader.ReadLineAsync()) != null)
+                    {
+                        if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+                        string payload = line.Substring(5).Trim();
+                        if (payload == "[DONE]") break;
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(payload);
+                            ApplyStreamChunk(doc.RootElement, content, partial, order, reply);
+                        }
+                        catch
+                        {
+                        }
+                        if (reply.Error != null) break;
+                        if (content.Length > 0)
+                        {
+                            string delta = content.ToString();
+                            content.Clear();
+                            onChunk?.Invoke(delta);
+                        }
+                    }
+                }
+
+                string text = reply.Content ?? "";
+                reply.Content = text;
+                if (reply.Error == null)
+                {
+                    foreach (var i in order) reply.ToolCalls.Add(partial[i]);
+                    reply.ToolsAccepted = useTools;
+                    if (reply.ToolCalls.Count == 0)
+                        reply.ToolCalls = ParseFallbackToolCalls(reply.Content);
+                }
+                return reply;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                reply.Error = $"{provider.Name}: {ex.Message}";
+                return reply;
+            }
+            finally
+            {
+                response?.Dispose();
+            }
+        }
+
+        static void ApplyStreamChunk(JsonElement root, StringBuilder content,
+            Dictionary<int, AiToolCall> partial, List<int> order, AiReply reply)
+        {
+            if (root.TryGetProperty("error", out var err))
+            {
+                reply.Error = err.ValueKind == JsonValueKind.String ? err.GetString() : err.ToString();
+                return;
+            }
+            if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array ||
+                choices.GetArrayLength() == 0)
+                return;
+            var choice = choices[0];
+            if (!choice.TryGetProperty("delta", out var delta) || delta.ValueKind != JsonValueKind.Object)
+                return;
+
+            if (delta.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String)
+            {
+                string piece = c.GetString();
+                if (!string.IsNullOrEmpty(piece))
+                {
+                    content.Append(piece);
+                    reply.Content = (reply.Content ?? "") + piece;
+                }
+            }
+
+            if (delta.TryGetProperty("reasoning_content", out var r) && r.ValueKind == JsonValueKind.String)
+            {
+                string piece = r.GetString();
+                if (!string.IsNullOrEmpty(piece))
+                {
+                    content.Append(piece);
+                    reply.Content = (reply.Content ?? "") + piece;
+                }
+            }
+
+            if (!delta.TryGetProperty("tool_calls", out var calls) || calls.ValueKind != JsonValueKind.Array)
+                return;
+
+            foreach (var call in calls.EnumerateArray())
+            {
+                int index = partial.Count;
+                if (call.TryGetProperty("index", out var ix) && ix.TryGetInt32(out int i)) index = i;
+                if (!partial.TryGetValue(index, out var acc))
+                {
+                    acc = new AiToolCall { Id = "", Name = "", Arguments = "" };
+                    partial[index] = acc;
+                    order.Add(index);
+                }
+                string id = ReadString(call, "id");
+                if (!string.IsNullOrEmpty(id)) acc.Id = id;
+                if (call.TryGetProperty("function", out var fn) && fn.ValueKind == JsonValueKind.Object)
+                {
+                    string name = ReadString(fn, "name");
+                    if (!string.IsNullOrEmpty(name)) acc.Name += name;
+                    string args = ReadString(fn, "arguments");
+                    if (!string.IsNullOrEmpty(args)) acc.Arguments += args;
+                }
+            }
+        }
+
         static async Task<JsonDocument> GetJsonAsync(string url, string key, CancellationToken ct)
         {
             var req = new HttpRequestMessage(HttpMethod.Get, url);
@@ -380,15 +544,15 @@ namespace NovaNote
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
             req.Content = new StringContent(JsonSerializer.Serialize(body, ReqOpt), Encoding.UTF8, "application/json");
             if (!string.IsNullOrEmpty(key)) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-            return await Http.SendAsync(req, ct);
+            return await ChatHttp.SendAsync(req, ct);
         }
 
-        static ChatRequestDto BuildRequest(AiModel model, List<AiMessage> messages, List<AiToolDef> tools)
+        static ChatRequestDto BuildRequest(AiModel model, List<AiMessage> messages, List<AiToolDef> tools, bool stream = false)
         {
             var body = new ChatRequestDto
             {
                 Model = model.Id,
-                Stream = false,
+                Stream = stream,
                 Temperature = 0.2,
                 Messages = messages.Select(ToDto).ToList()
             };

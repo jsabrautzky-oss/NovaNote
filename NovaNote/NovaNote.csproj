@@ -11,10 +11,10 @@
     <StartupObject>NovaNote.Program</StartupObject>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>novanote.ico</ApplicationIcon>
-    <VersionPrefix>0.5.1</VersionPrefix>
-    <Version>0.5.1</Version>
-    <AssemblyVersion>0.5.1.0</AssemblyVersion>
-    <FileVersion>0.5.1.0</FileVersion>
+    <VersionPrefix>0.5.2</VersionPrefix>
+    <Version>0.5.2</Version>
+    <AssemblyVersion>0.5.2.0</AssemblyVersion>
+    <FileVersion>0.5.2.0</FileVersion>
     <UseWindowsForms>false</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
@@ -23,6 +23,7 @@
     <PackageReference Include="Acornima" Version="1.9.0" />
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
     <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <PackageReference Include="MdXaml" Version="1.27.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
@@ -30,6 +31,14 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.11" />
     <PackageReference Include="Velopack" Version="1.2.161" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\Chat\chat.html" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Chat\chat.css" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Chat\chat.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Chat\marked.min.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Chat\highlight.min.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.2
+Das KI-Chat-Panel rendert Antworten jetzt in WebView2 (HTML/JS) statt als nackter Text.
+
+### Neue Features
+- Chat-Panel nutzt `Microsoft.Web.WebView2` mit lokalem Frontend `NovaNote/Assets/Chat/` (`chat.html`, `chat.css`, `chat.js`, vendored `marked.min.js` und `highlight.min.js`); geladen über `SetVirtualHostNameToFolderMapping("novanote.chat", …)`, offline ohne CDN
+- Markdown-Rendering (Überschriften, Listen, Tabellen, Inline-Code) und Syntax-Highlighting für Codeblöcke im Theme-look (hell/dunkel via `setTheme` bei Theme-Wechsel)
+- Jeder Codeblock hat „Kopieren“ (Zwischenablage) und „In Editor einfügen“ (`insertIntoEditor` → `DocumentView.InsertAtCaret`, eine Undo-Group, ersetzt bestehende Auswahl)
+- Tool-Calls als aufklappbare `<details>`-Karten mit Status ⏳ Läuft / 🟡 Warten auf Bestätigung / ✅ Abgeschlossen / ❌ Fehler / 🚫 Verworfen, formatierten Arguments und Ergebnis; Bestätigen/Verwerfen sitzt inline im Card
+- Gestreamte Antworten: `LocalAiClient.ChatStreamAsync` liest SSE-Deltas (`stream:true`) und liefert `appendChunk` gebatcht (~70 ms) an das Frontend; Auto-Scroll klebt unten, „Nach unten“-Button bei manuellem Scroll
+- Chat-Events aus C#: `addMessage`, `appendChunk`, `addToolCall`, `updateToolResult`, `updateToolStatus`, `setBusy`, `setTheme`, `clearChat`; der Verlauf wird nach dem Laden des Frontends replayt
+- DevTools, Standard-Kontextmenü, Statusbar und Zoom im Chat deaktiviert; fremde Navigation wird geblockt, HTML aus Modellantworten wird vor dem Rendern bereinigt (script/on*-Attribute/`javascript:`)
+- Fallback: ohne WebView2-Runtime bleibt die bisherige TextBox-Ausgabe sichtbar und Edit-Tools laufen ohne Bestätigungs-Card
+
+### Geändert
+- `AiApplyButton`/`AiDiscardButton` im Panel entfernt (Bestätigung inline im Tool-Card, Code über den Einfügen-Button)
+- `AiPanelWidth` ist jetzt optional: ohne gespeicherten Wert startet das Panel mit halber Fensterbreite (mindestens 180 px, nach Fenster-Größenänderung neu berechnet); ein per GridSplitter gespeicherter Wert wird wie bisher übernommen (180–720 px)
+- Scan-, Fehler- und Infozeilen erscheinen als Info-Zeilen im Chat statt als Textblock
+- Chat-Daten liegen in `%APPDATA%\NovaNote\WebView2` (geteilte WebView2-Umgebung pro Fenster)
+
+### Installation / Releases
+- Velopack-Installer: `NovaNote-win-Setup.exe`
+- Portable-Zip: `NovaNote-win-Portable.zip`
+- Delta-Paket von 0.5.1 (`NovaNote-0.5.2-delta.nupkg`)
+- `Microsoft.Web.WebView2` und `WebView2Loader.dll` sind im Paket enthalten; das Chat-Frontend liegt in `Assets\Chat\`
+
 ## 0.5.1
 Bugfix-Release: Der Update-Setup konnte nicht gestartet werden („Datei wird von einem anderen Prozess verwendet“), weil der Download die Datei beim Start noch offen hielt.
 
