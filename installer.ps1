@@ -65,5 +65,33 @@ $releaseAssets = @(
   @{ RelativeFileName = "$packId-win-Portable.zip"; Type = "Portable" }
 )
 
+$deltaNupkg = Join-Path $releasesDir "$packId-$packVersion-delta.nupkg"
+$deltaFileName = "$packId-$packVersion-delta.nupkg"
+$releasesFile = Join-Path $releasesDir "RELEASES"
+
+if (Test-Path -LiteralPath $deltaNupkg) {
+  $deltaSha1 = (Get-FileHash -Algorithm SHA1 -LiteralPath $deltaNupkg).Hash
+  $deltaSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $deltaNupkg).Hash
+  $deltaSize = (Get-Item -LiteralPath $deltaNupkg).Length
+  $deltaLine = "$deltaSha1 $deltaFileName $deltaSize"
+
+  $feedAssets += @{
+    PackageId = $packId
+    Version = $packVersion
+    Type = "Delta"
+    FileName = $deltaFileName
+    SHA1 = $deltaSha1
+    SHA256 = $deltaSha256
+    Size = $deltaSize
+  }
+  $releaseAssets += @{ RelativeFileName = $deltaFileName; Type = "Delta" }
+
+  $existing = [System.IO.File]::ReadAllText($releasesFile, [System.Text.UTF8Encoding]::new($false))
+  if ($existing -notmatch [regex]::Escape($deltaFileName)) {
+    if (-not ($existing.EndsWith("`n") -or $existing.EndsWith("`r`n"))) { $existing += "`n" }
+    [System.IO.File]::WriteAllText($releasesFile, $existing + $deltaLine + "`n", [System.Text.UTF8Encoding]::new($false))
+  }
+}
+
 Set-Content -LiteralPath (Join-Path $releasesDir "releases.win.json") -Value (@{ Assets = $feedAssets } | ConvertTo-Json -Compress -Depth 5) -Encoding UTF8
 Set-Content -LiteralPath (Join-Path $releasesDir "assets.win.json") -Value ($releaseAssets | ConvertTo-Json -Compress -Depth 5) -Encoding UTF8

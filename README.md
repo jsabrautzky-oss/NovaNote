@@ -6,7 +6,7 @@ Aktuelle Version: **0.7.1**
 GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.7.1
 
 ## Neu in 0.7.1
-- **Update in-app mit Fortschritt**: installierte Versionen updaten über Velopack (GitHub-`RELEASES`-Asset, Delta-Updates möglich); das Dialog „NovaNote – Update“ zeigt Download und Installation mit Balken und Prozent — vorher gab es nur einen Wait-Cursor
+- **Update in-app mit Fortschritt**: installierte Versionen updaten über Velopack (GitHub-`RELEASES`-Asset); das Dialog „NovaNote – Update“ zeigt Download und Installation mit Balken und Prozent — vorher gab es nur einen Wait-Cursor. Das Delta-Paket ab 0.7.0 lädt nur ~0,3 MB statt des vollen Pakets (~91 MB)
 - **Editor startet nach dem Update neu**: NovaNote wartet den sauberen Exit ab, installiert und öffnet sich wieder mit der neuen Version; alle Tabs kommen aus der gespeicherten Session zurück
 - **Neustart behält die Start-Argumente** (Datei, `/S` für Fensterlage), ohne `/N` und `/?`; eine übergebene Datei wird nicht doppelt geöffnet, wenn ihr Tab schon aus der Session wiederhergestellt ist
 - **Portable und Build-Versionen**: „Update prüfen“ lädt das `NovaNote-win-Setup.exe` und öffnet es mit UI — NovaNote bleibt dabei offen statt sich zu beenden

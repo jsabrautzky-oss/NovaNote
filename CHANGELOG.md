@@ -12,6 +12,7 @@ Kurz: Das Update läuft jetzt in-app mit Fortschrittsbalken und startet den Edit
 - FEAT update: „Update prüfen“ in Portable-/Build-Versionen lädt das Setup und öffnet es mit UI, NovaNote bleibt dabei offen
 - FIX ui: eine übergebene Datei wird nach dem Neustart nicht doppelt geöffnet, wenn der Tab schon aus der Session wiederhergestellt ist (der bestehende Tab wird aktiviert)
 - TEST harness: Der UI-Harness prüft `ActivateExistingTab` (case-insensitiv, kein Doppel-Tab) und das Update-Fortschrittsdialog (Balken und Prozent, Schließen bis `AllowClose()` blockiert)
+- CHORE update: Das `RELEASES`-Feed enthält jetzt die Delta-Zeile (`installer.ps1`) — ohne sie schrieb Velopack nur Full-Einträge und jeder Update lud das Full-Paket (~91 MB) statt des Deltas (~0,3 MB)
 
 ### Paket
 - Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.7.1-full.nupkg`, Delta von 0.7.0 (`NovaNote-0.7.1-delta.nupkg`)
