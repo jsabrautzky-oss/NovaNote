@@ -101,8 +101,14 @@ namespace NovaNote
 
             // Wenn eine Datei übergeben wurde, diese im aktiven Fenster öffnen.
             // Das entspricht dem Öffnen durch Windows-Dateizuordnung.
+            // Nach einem Update-Restart ist der Tab oft schon aus der Session wiederhergestellt.
             if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
-                window.OpenInNewTab(file);
+            {
+                var already = Application.Current.Windows.OfType<MainWindow>()
+                    .FirstOrDefault(w => w.ActivateExistingTab(file));
+                if (already != null) already.Activate();
+                else window.OpenInNewTab(file);
+            }
         }
     }
 }

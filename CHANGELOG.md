@@ -2,6 +2,20 @@
 <!-- Konvention: eine Bullet = eine Änderung, ein Zeile, kurz. Präfix FEAT | FIX | CHORE | TEST (+ Bereich, z. B. ki/save/ui/harness).
      Die Zeile "Kurz: …" unter jeder Überschrift ist die einzeilige Summary; release.ps1 baut daraus die GitHub-Release-Notes. -->
 
+## 0.7.1
+Kurz: Das Update läuft jetzt in-app mit Fortschrittsbalken und startet den Editor danach automatisch neu.
+
+- FEAT update: installierte Versionen updaten über Velopack (`GithubSource` + `UpdateManager` über das `RELEASES`-Asset, Delta-Updates möglich) statt über den Setup-Download
+- FEAT update: neues Dialog „NovaNote – Update“ zeigt Download und Installation mit Fortschrittsbalken und Prozent (vorher nur ein Wait-Cursor)
+- FIX update: NovaNote startet nach dem Update wieder automatisch — `WaitExitThenApplyUpdates(restart:true)` wartet auf den sauberen Exit, installiert und öffnet den Editor mit der neuen Version
+- FEAT update: der Neustart behält die Start-Argumente (Datei, `/S`) bei, ohne `/N` und `/?`
+- FEAT update: „Update prüfen“ in Portable-/Build-Versionen lädt das Setup und öffnet es mit UI, NovaNote bleibt dabei offen
+- FIX ui: eine übergebene Datei wird nach dem Neustart nicht doppelt geöffnet, wenn der Tab schon aus der Session wiederhergestellt ist (der bestehende Tab wird aktiviert)
+- TEST harness: Der UI-Harness prüft `ActivateExistingTab` (case-insensitiv, kein Doppel-Tab) und das Update-Fortschrittsdialog (Balken und Prozent, Schließen bis `AllowClose()` blockiert)
+
+### Paket
+- Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.7.1-full.nupkg`, Delta von 0.7.0 (`NovaNote-0.7.1-delta.nupkg`)
+
 ## 0.7.0
 Kurz: Die KI kennt die Dokument-Art und kann sie umstellen; der Speicher-Dialog legt die passende Endung fest; die „KI denkt…“-Zeile blendet dezent ein; der KI-Chat bekommt Eingabe-Historie und Favoriten; die Kontextgröße des Modells wird erkannt, berücksichtigt und als Füllbalken angezeigt.
 

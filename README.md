@@ -2,8 +2,14 @@
 
 **Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-Aktuelle Version: **0.7.0**  
-GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.7.0
+Aktuelle Version: **0.7.1**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.7.1
+
+## Neu in 0.7.1
+- **Update in-app mit Fortschritt**: installierte Versionen updaten über Velopack (GitHub-`RELEASES`-Asset, Delta-Updates möglich); das Dialog „NovaNote – Update“ zeigt Download und Installation mit Balken und Prozent — vorher gab es nur einen Wait-Cursor
+- **Editor startet nach dem Update neu**: NovaNote wartet den sauberen Exit ab, installiert und öffnet sich wieder mit der neuen Version; alle Tabs kommen aus der gespeicherten Session zurück
+- **Neustart behält die Start-Argumente** (Datei, `/S` für Fensterlage), ohne `/N` und `/?`; eine übergebene Datei wird nicht doppelt geöffnet, wenn ihr Tab schon aus der Session wiederhergestellt ist
+- **Portable und Build-Versionen**: „Update prüfen“ lädt das `NovaNote-win-Setup.exe` und öffnet es mit UI — NovaNote bleibt dabei offen statt sich zu beenden
 
 ## Neu in 0.7.0
 - **Kontextgrenze pro Modell**: Tiktoken zählt die Prompt-Tokens exakt (o200k für `gpt-4o`/o-series, cl100k für andere OpenAI-kompatible Modelle); LM Studio/Ollama nutzen eine Heuristik und kalibrieren sie an den vom Server gemeldeten `usage`-Tokens. Der Scan erkennt jetzt auch Ollama-Kontexte (`ollama.context_length`), ohne Erkenntung gilt 4096 als „Annahme“
@@ -135,7 +141,7 @@ Hinweis: Weitere Sprachen sollen später folgen.
 4. Optional: `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` per Doppelklick mit NovaNote öffnen.
 
 Direkter Installer-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.1/NovaNote-win-Setup.exe
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.7.1/NovaNote-win-Setup.exe
 
 ## Installation als Portable-Version
 1. `NovaNote-win-Portable.zip` von der GitHub-Release-Seite herunterladen.
@@ -143,11 +149,12 @@ https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.1/NovaNote-wi
 3. `NovaNote.exe` starten.
 
 Direkter Portable-Download:  
-https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.6.1/NovaNote-win-Portable.zip
+https://github.com/jsabrautzky-oss/NovaNote/releases/download/v0.7.1/NovaNote-win-Portable.zip
 
 ## Updates
-- NovaNote kann beim Start automatisch prüfen, ob auf GitHub ein neuer Release mit `NovaNote-win-Setup.exe` vorhanden ist.
-- Wenn ein Update gefunden wird, fragt NovaNote, ob das Setup heruntergeladen und ausgeführt wird.
+- NovaNote prüft beim Start automatisch, ob auf GitHub ein neuer Release vorhanden ist (installierte Version über das `RELEASES`-Asset von Velopack).
+- Ein Update wird in-app heruntergeladen und installiert: ein Fortschrittsdialog zeigt die Prozentzahl, Velopack zeigt die Installation, danach startet NovaNote mit der neuen Version automatisch neu (alle Tabs kommen aus der gespeicherten Session zurück).
+- In Portable- und Build-Versionen lädt „Update prüfen“ das `NovaNote-win-Setup.exe` und öffnet es; NovaNote bleibt dabei offen.
 - Die automatische Update-Prüfung kann im Menü „Hilfe → Update → Automatisch auf Updates prüfen“ deaktiviert werden.
 - „Über NovaNote“ enthält einen Button „Update prüfen“, der einen sofortigen Update-Check ausführt.
 

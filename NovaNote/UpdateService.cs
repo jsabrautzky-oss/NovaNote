@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Input;
 using Velopack;
 using Velopack.Locators;
+using Velopack.Sources;
 
 namespace NovaNote
 {
@@ -25,7 +26,7 @@ namespace NovaNote
 
         static bool _startupScheduled;
         static bool _promptActive;
-        static bool _downloadActive;
+        static bool _updateActive;
 
         public static bool IsInstalled =>
             VelopackLocator.IsCurrentSet &&
@@ -46,7 +47,7 @@ namespace NovaNote
 
         public static async Task CheckAsync(Window owner, bool manual)
         {
-            if (_promptActive || _downloadActive)
+            if (_promptActive || _updateActive)
             {
                 if (manual)
                     MessageBox.Show(owner, "Ein Update-Vorgang läuft bereits.", "Update prüfen", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -63,6 +64,136 @@ namespace NovaNote
                 return;
             }
 
+            if (IsInstalled) await CheckVelopackAsync(owner, current, manual);
+            else await CheckSetupFallbackAsync(owner, current, manual);
+        }
+
+        static async Task CheckVelopackAsync(Window owner, SemanticVersion current, bool manual)
+        {
+            UpdateManager manager;
+            UpdateInfo info;
+            try
+            {
+                manager = new UpdateManager(
+                    new GithubSource(RepoUrl, null, current.ToString().Contains("-")),
+                    null,
+                    VelopackLocator.Current);
+                info = await manager.CheckForUpdatesAsync();
+            }
+            catch (Exception ex)
+            {
+                if (manual) MessageBox.Show(owner, $"GitHub-Update-Check fehlgeschlagen:\n\n{ex.Message}", "Update prüfen", MessageBoxButton.OK, MessageBoxImage.Warning);
+                else Log($"GitHub-Update-Check fehlgeschlagen: {ex}");
+                return;
+            }
+
+            var latest = info?.TargetFullRelease?.Version;
+            if (latest == null || latest <= current)
+            {
+                if (manual) MessageBox.Show(owner, $"Kein Update verfügbar.\n\nAktuelle Version: {current}", "Update prüfen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (Dismissed(latest, manual)) return;
+
+            _promptActive = true;
+            var result = MessageBox.Show(owner,
+                $"Ein Update für NovaNote ist verfügbar:\n\n" +
+                $"Neue Version: {latest}\n" +
+                $"Aktuelle Version: {current}\n\n" +
+                "Das Update wird heruntergeladen und installiert.\n" +
+                "NovaNote wird beendet und danach mit der neuen Version neu gestartet.\n\n" +
+                "Fortfahren?",
+                "Update verfügbar",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            _promptActive = false;
+
+            if (result != MessageBoxResult.Yes)
+            {
+                Dismiss(latest);
+                return;
+            }
+
+            await ApplyVelopackUpdateAsync(owner, manager, info, latest);
+        }
+
+        static async Task ApplyVelopackUpdateAsync(Window owner, UpdateManager manager, UpdateInfo info, SemanticVersion version)
+        {
+            foreach (var w in Application.Current.Windows.OfType<MainWindow>())
+            {
+                if (!w.SaveSessionForUpdate()) return;
+            }
+            SessionStore.SavePrefs();
+
+            _updateActive = true;
+            var oldCursor = owner.Cursor;
+            owner.Cursor = Cursors.Wait;
+
+            var dialog = new UpdateProgressDialog { Owner = owner };
+            dialog.SetText($"Update auf {version} wird heruntergeladen …");
+            dialog.Show();
+
+            try
+            {
+                await manager.DownloadUpdatesAsync(info, percent =>
+                    owner.Dispatcher.BeginInvoke(new Action(() => dialog.SetProgress(percent))));
+
+                dialog.SetText($"Update auf {version} wird installiert … NovaNote wird beendet und neu gestartet.");
+                dialog.SetProgress(100);
+
+                var restartArgs = RestartArgs();
+                foreach (var w in Application.Current.Windows.OfType<MainWindow>())
+                    w.AllowUpdateClose();
+                if (owner is AboutDialog) owner.Close();
+
+                manager.WaitExitThenApplyUpdates(info.TargetFullRelease, silent: false, restart: true, restartArgs);
+                Log($"Update-Installation gestartet: {version}");
+
+                dialog.AllowClose();
+                Application.Current.Shutdown(0);
+            }
+            catch (Exception ex)
+            {
+                owner.Cursor = oldCursor;
+                dialog.AllowClose();
+                dialog.Close();
+                MessageBox.Show(owner, $"Update fehlgeschlagen:\n\n{ex.Message}", "Update fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Log($"Update fehlgeschlagen: {ex}");
+            }
+            finally
+            {
+                _updateActive = false;
+                try
+                {
+                    owner.Cursor = oldCursor;
+                    dialog.AllowClose();
+                    dialog.Close();
+                }
+                catch { }
+            }
+        }
+
+        static string[] RestartArgs()
+            => App.StartupArgs.Where(a => a != "/N" && a != "/?").ToArray();
+
+        static bool Dismissed(SemanticVersion latest, bool manual)
+        {
+            if (manual) return false;
+            var dismissed = SessionStore.Prefs.DismissedUpdateVersion;
+            return !string.IsNullOrEmpty(dismissed) &&
+                string.Equals(dismissed, latest.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        static void Dismiss(SemanticVersion latest)
+        {
+            SessionStore.Prefs.DismissedUpdateVersion = latest.ToString();
+            SessionStore.SavePrefs();
+        }
+
+        // Portable-/Build-Version: kein Velopack-Update möglich, daher das Setup herunterladen und öffnen.
+        static async Task CheckSetupFallbackAsync(Window owner, SemanticVersion current, bool manual)
+        {
             GitHubUpdateInfo latest;
             try
             {
@@ -75,30 +206,21 @@ namespace NovaNote
                 return;
             }
 
-            if (latest == null)
-            {
-                if (manual) MessageBox.Show(owner, "Kein Update verfügbar.", "Update prüfen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            if (latest.Version <= current)
+            if (latest == null || latest.Version <= current)
             {
                 if (manual) MessageBox.Show(owner, $"Kein Update verfügbar.\n\nAktuelle Version: {current}", "Update prüfen", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            var dismissed = SessionStore.Prefs.DismissedUpdateVersion;
-            if (!manual && !string.IsNullOrEmpty(dismissed) &&
-                string.Equals(dismissed, latest.Version.ToString(), StringComparison.OrdinalIgnoreCase))
-                return;
+            if (Dismissed(latest.Version, manual)) return;
 
             _promptActive = true;
             var result = MessageBox.Show(owner,
                 $"Ein Update für NovaNote ist verfügbar:\n\n" +
                 $"Neue Version: {latest.Version}\n" +
                 $"Aktuelle Version: {current}\n\n" +
-                "Das NovaNote-Setup wird heruntergeladen und ausgeführt.\n" +
-                "NovaNote wird danach beendet.\n\n" +
+                "Diese Version ist nicht installiert (Portable- oder Build-Version).\n" +
+                "Das NovaNote-Setup wird heruntergeladen und geöffnet; NovaNote bleibt offen.\n\n" +
                 "Fortfahren?",
                 "Update verfügbar",
                 MessageBoxButton.YesNo,
@@ -107,12 +229,46 @@ namespace NovaNote
 
             if (result != MessageBoxResult.Yes)
             {
-                SessionStore.Prefs.DismissedUpdateVersion = latest.Version.ToString();
-                SessionStore.SavePrefs();
+                Dismiss(latest.Version);
                 return;
             }
 
-            await DownloadAndRunSetupAsync(owner, latest.SetupDownloadUrl, latest.Version.ToString());
+            _updateActive = true;
+            var oldCursor = owner.Cursor;
+            owner.Cursor = Cursors.Wait;
+
+            var dialog = new UpdateProgressDialog { Owner = owner };
+            dialog.SetText($"NovaNote-Setup {latest.Version} wird heruntergeladen …");
+            dialog.Show();
+
+            try
+            {
+                var setupPath = Path.Combine(Path.GetTempPath(), SetupAssetName);
+                if (File.Exists(setupPath)) File.Delete(setupPath);
+
+                await DownloadSetupAsync(latest.SetupDownloadUrl, setupPath);
+
+                dialog.SetText("Das Setup wird geöffnet – NovaNote bleibt offen.");
+                dialog.SetProgress(100);
+
+                LaunchSetup(setupPath);
+                Log($"Update-Setup geöffnet: {latest.Version}");
+            }
+            catch (Exception ex)
+            {
+                owner.Cursor = oldCursor;
+                dialog.AllowClose();
+                dialog.Close();
+                MessageBox.Show(owner, $"Update-Setup konnte nicht gestartet werden:\n\n{ex.Message}", "Update fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Log($"Update-Setup fehlgeschlagen: {ex}");
+            }
+            finally
+            {
+                _updateActive = false;
+                owner.Cursor = oldCursor;
+                dialog.AllowClose();
+                dialog.Close();
+            }
         }
 
         static SemanticVersion GetCurrentVersion()
@@ -198,48 +354,6 @@ namespace NovaNote
             return null;
         }
 
-        static async Task DownloadAndRunSetupAsync(Window owner, string url, string version)
-        {
-            foreach (var w in Application.Current.Windows.OfType<MainWindow>())
-            {
-                if (!w.SaveSessionForUpdate()) return;
-            }
-            SessionStore.SavePrefs();
-
-            _downloadActive = true;
-            var oldCursor = owner.Cursor;
-            owner.Cursor = Cursors.Wait;
-
-            try
-            {
-                var setupPath = Path.Combine(Path.GetTempPath(), SetupAssetName);
-                if (File.Exists(setupPath)) File.Delete(setupPath);
-
-                await DownloadSetupAsync(url, setupPath);
-
-                if (owner is AboutDialog) owner.Close();
-
-                LaunchSetup(setupPath);
-
-                foreach (var w in Application.Current.Windows.OfType<MainWindow>())
-                    w.AllowUpdateClose();
-
-                Application.Current.Shutdown(0);
-                Log($"Update-Setup gestartet: {version}");
-            }
-            catch (Exception ex)
-            {
-                owner.Cursor = oldCursor;
-                MessageBox.Show(owner, $"Update-Setup konnte nicht gestartet werden:\n\n{ex.Message}", "Update fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Warning);
-                Log($"Update-Setup fehlgeschlagen: {ex}");
-            }
-            finally
-            {
-                _downloadActive = false;
-                owner.Cursor = oldCursor;
-            }
-        }
-
         static async Task DownloadSetupAsync(string url, string setupPath)
         {
             using var client = new HttpClient();
@@ -255,11 +369,7 @@ namespace NovaNote
 
         static void LaunchSetup(string setupPath)
         {
-            var exeArgs = string.Join(" ", App.StartupArgs.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
-            var setupArgs = "--silent";
-            if (!string.IsNullOrEmpty(exeArgs)) setupArgs += " -- " + exeArgs;
-
-            Process.Start(new ProcessStartInfo(setupPath, setupArgs) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(setupPath) { UseShellExecute = true });
         }
 
         static void Log(string message)

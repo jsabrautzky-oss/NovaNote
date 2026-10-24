@@ -221,6 +221,27 @@ namespace NovaNote
         public TabModel FindTab(DocumentView view)
             => Tabs.FirstOrDefault(t => ReferenceEquals(t.View, view));
 
+        public bool ActivateExistingTab(string path)
+        {
+            var full = FullPath(path);
+            if (full == null) return false;
+
+            var tab = Tabs.FirstOrDefault(t =>
+                string.Equals(FullPath(t.View.Path_), full, StringComparison.OrdinalIgnoreCase));
+            if (tab == null) return false;
+
+            TabStrip.SelectedItem = tab;
+            ActivateTab(tab);
+            return true;
+        }
+
+        static string FullPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            try { return Path.GetFullPath(path); }
+            catch { return null; }
+        }
+
         void PushHistory(TabModel tab)
         {
             if (tab == null) return;
