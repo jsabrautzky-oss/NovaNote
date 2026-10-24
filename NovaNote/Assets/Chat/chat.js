@@ -370,9 +370,27 @@ function updateToolResult(ev) {
   setStatus(ev.id, ev.isError ? 'error' : 'done');
 }
 
+let busyNow = false;
+let busyHideTimer = 0;
+
 function setBusy(ev) {
-  busyBox.hidden = !ev.busy;
-  if (ev.busy && stick) scrollDown();
+  busyNow = !!ev.busy;
+  if (busyHideTimer) {
+    clearTimeout(busyHideTimer);
+    busyHideTimer = 0;
+  }
+  if (busyNow) {
+    busyBox.hidden = false;
+    void busyBox.offsetWidth;
+    busyBox.classList.add('on');
+    if (stick) scrollDown();
+  } else {
+    busyBox.classList.remove('on');
+    busyHideTimer = setTimeout(() => {
+      busyHideTimer = 0;
+      if (!busyNow) busyBox.hidden = true;
+    }, 600);
+  }
 }
 
 function setTheme(ev) {

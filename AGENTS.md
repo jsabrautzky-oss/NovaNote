@@ -15,3 +15,20 @@
 - Wenn beim Testen oder beim Schließen des Programms ein Dialog wie „NovaNote – Speichern?“ erscheint: **mit „Nein“ bestätigen** (Änderungen verwerfen).
 - Nie mit „Ja“ speichern und nie mit „Abbrechen“ abbrechen – „Abbrechen“ und „Ja“ lassen das Programm offen bzw. schreiben Testdaten in echte Dateien.
 - Bei „Alle Tabs schließen“ gilt dasselbe: jeder aufgetauchte Speichern-Dialog wird mit „Nein“ beantwortet.
+
+## Historie (CHANGELOG.md)
+- `CHANGELOG.md` ist die einzige Historie des Projekts: nach **jeder** abgeschlossenen Änderung sofort eine Bullet im Abschnitt `## Unreleased` eintragen – eine Bullet pro Änderung, ein Zeile, kurz.
+- Präfix je Bullet: `FEAT`, `FIX`, `CHORE` oder `TEST` plus Bereich, z. B. `FEAT ki: …`, `FIX save: …`, `TEST harness: …`.
+- Unter jeder Versionsüberschrift steht eine Zeile `Kurz: …` (einzeilige Summary). `release.ps1` liest den Abschnitt der Version und baut daraus die GitHub-Release-Notes – die `Kurz:`-Zeile wird die erste Notes-Zeile.
+- `## Unreleased` bleibt immer oben; beim Release wird der Abschnitt zu `## x.y.z` umbenannt und die `Kurz:`-Zeile auf die endgültige Summary geprüft.
+- Harness-Änderungen liegen außerhalb des Repos (`%TEMP%\opencode\chatTest`) und werden nur als `TEST harness: …` in `CHANGELOG.md` festgehalten.
+
+## Release
+1. `NovaNote/NovaNote.csproj`: `VersionPrefix`, `Version`, `AssemblyVersion`, `FileVersion` auf die neue Version setzen.
+2. `CHANGELOG.md`: `## Unreleased` → `## x.y.z`, `Kurz:`-Zeile als Summary, `### Paket`-Bullet (Setup, Portable-Zip, Full-Paket, Delta von der Vorgängerversion).
+3. `README.md`: „Aktuelle Version“ und GitHub-Release-Link aktualisieren, neuen Abschnitt `## Neu in x.y.z` mit den Kurzpunkten anlegen (neueste oben).
+4. Commit im Stil des Repos, z. B. `Ship 0.6.2 with …`; nur intendierte Dateien stagen, keine Secrets.
+5. `installer.ps1 -packVersion x.y.z` (publish + `vpk pack`, erzeugt `Releases/` inkl. Delta aus dem vorherigen Stand).
+6. `git tag vx.y.z` und pushen (`git push; git push origin vx.y.z`).
+7. `release.ps1 -version x.y.z -tag vx.y.z` – die Release-Notes kommen automatisch aus dem `CHANGELOG.md`-Abschnitt (`-notesVersion`, `-changelogPath`, `-deltaFrom` als Overrides; `-skipPack` wenn schon gepackt; `-prerelease` für Beta; `-dryRun` erzeugt nur die Notes-Datei ohne GitHub-Release).
+

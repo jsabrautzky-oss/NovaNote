@@ -41,6 +41,7 @@ namespace NovaNote
         public string Role { get; set; } = "user";
         public string Content { get; set; } = "";
         public List<string> Images { get; set; } = null;
+        public int ImageTokens { get; set; }
         public string ToolCallId { get; set; } = null;
         public List<AiToolCall> ToolCalls { get; set; } = null;
     }
@@ -51,6 +52,9 @@ namespace NovaNote
         public List<AiToolCall> ToolCalls { get; set; } = new List<AiToolCall>();
         public bool ToolsAccepted { get; set; }
         public string Error { get; set; } = null;
+        public int PromptTokens { get; set; }
+        public int CompletionTokens { get; set; }
+        public bool HasUsage { get; set; }
     }
 
     public static class LocalAiClient
@@ -73,7 +77,8 @@ namespace NovaNote
             "Dieser Server nimmt keine native Tool-Aufrufe. Wenn du den Editor ändern sollst, gib genau einen Block " +
             "```nova\n{\"action\":\"replace_all_text\",\"code\":\"...\"}\n``` aus. Erlaubte Aktionen: " +
             "replace_all_text (code), replace_lines (from_line,to_line,text), insert_at_line (line,text), " +
-            "search_document (pattern), goto_line (line), select_lines (from_line,to_line).";
+            "search_document (pattern), get_language (keine Argumente), set_language (language), " +
+            "goto_line (line), select_lines (from_line,to_line).";
 
         public static string NormalizeBase(string url)
         {
@@ -240,7 +245,11 @@ namespace NovaNote
 
         static int ReadContext(JsonElement e)
         {
-            foreach (var key in new[] { "context_length", "contextWindow", "max_context_length", "n_ctx", "num_ctx", "context_window", "max_prompt_length" })
+            foreach (var key in new[]
+            {
+                "context_length", "contextWindow", "max_context_length", "n_ctx", "num_ctx",
+                "context_window", "max_prompt_length", "ollama.context_length", "llama.context_length"
+            })
             {
                 if (e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out int n) && n > 0)
                     return n;
@@ -248,8 +257,14 @@ namespace NovaNote
             if (e.TryGetProperty("parameters", out var p) && p.ValueKind == JsonValueKind.Object &&
                 p.TryGetProperty("num_ctx", out var n2) && n2.TryGetInt32(out int v2) && v2 > 0)
                 return v2;
-            if (e.TryGetProperty("metadata", out var md) && md.ValueKind == JsonValueKind.Object)
-                return ReadContext(md);
+            foreach (var key in new[] { "metadata", "model_info", "options", "details" })
+            {
+                if (e.TryGetProperty(key, out var nested) && nested.ValueKind == JsonValueKind.Object)
+                {
+                    int inner = ReadContext(nested);
+                    if (inner > 0) return inner;
+                }
+            }
             return 0;
         }
 
@@ -362,11 +377,11 @@ namespace NovaNote
             try
             {
                 using var response = await PostChatAsync(url, provider.ApiKey,
-                    BuildRequest(model, messages, useTools ? tools : null), ct);
+                    BuildRequest(provider, model, messages, useTools ? tools : null), ct);
 
                 if (!response.IsSuccessStatusCode && useTools)
                 {
-                    using var retry = await PostChatAsync(url, provider.ApiKey, BuildRequest(model, messages, null), ct);
+                    using var retry = await PostChatAsync(url, provider.ApiKey, BuildRequest(provider, model, messages, null), ct);
                     if (retry.IsSuccessStatusCode)
                     {
                         ParseReply(await SafeTextAsync(retry), reply);
@@ -416,7 +431,7 @@ namespace NovaNote
             try
             {
                 response = await PostChatAsync(url, provider.ApiKey,
-                    BuildRequest(model, messages, useTools ? tools : null, true), ct);
+                    BuildRequest(provider, model, messages, useTools ? tools : null, true), ct);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -428,7 +443,7 @@ namespace NovaNote
                     if (useTools)
                     {
                         using var retry = await PostChatAsync(url, provider.ApiKey,
-                            BuildRequest(model, messages, null, false), ct);
+                            BuildRequest(provider, model, messages, null, false), ct);
                         if (retry.IsSuccessStatusCode)
                         {
                             ParseReply(await SafeTextAsync(retry), reply);
@@ -512,6 +527,7 @@ namespace NovaNote
                 reply.Error = err.ValueKind == JsonValueKind.String ? err.GetString() : err.ToString();
                 return;
             }
+            ReadUsage(root, reply);
             if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array ||
                 choices.GetArrayLength() == 0)
                 return;
@@ -585,15 +601,25 @@ namespace NovaNote
             return await ChatHttp.SendAsync(req, ct);
         }
 
-        static ChatRequestDto BuildRequest(AiModel model, List<AiMessage> messages, List<AiToolDef> tools, bool stream = false)
+        static ChatRequestDto BuildRequest(AiProvider provider, AiModel model, List<AiMessage> messages,
+            List<AiToolDef> tools, bool stream = false)
         {
+            int ctx = ContextBudget.ContextFor(model);
+            int used = ContextBudget.Count(messages, provider, model);
+            int maxTokens = Math.Max(ContextBudget.MinReserve, ctx - used);
+
             var body = new ChatRequestDto
             {
                 Model = model.Id,
                 Stream = stream,
                 Temperature = 0.2,
+                MaxTokens = maxTokens,
                 Messages = messages.Select(ToDto).ToList()
             };
+            if (stream)
+                body.StreamOptions = new Dictionary<string, object> { ["include_usage"] = true };
+            if (provider != null && provider.Kind == AiKind.Ollama)
+                body.Options = new Dictionary<string, object> { ["num_ctx"] = ctx };
             if (tools != null && tools.Count > 0)
             {
                 body.Tools = tools.Select(t => new ToolDto
@@ -660,6 +686,7 @@ namespace NovaNote
                     reply.Error = err.ValueKind == JsonValueKind.String ? err.GetString() : err.ToString();
                     return;
                 }
+                ReadUsage(root, reply);
                 if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array ||
                     choices.GetArrayLength() == 0)
                 {
@@ -699,6 +726,38 @@ namespace NovaNote
             {
                 reply.Error = $"Antwort nicht lesbar: {ex.Message}";
             }
+        }
+
+        static void ReadUsage(JsonElement root, AiReply reply)
+        {
+            if (!root.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object) return;
+            int prompt = 0, completion = 0;
+            foreach (var key in new[] { "prompt_tokens", "prompt_eval_count", "input_tokens" })
+                if (usage.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out int n))
+                { prompt = n; break; }
+            foreach (var key in new[] { "completion_tokens", "eval_count", "output_tokens" })
+                if (usage.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out int n))
+                { completion = n; break; }
+            if (prompt > 0 || completion > 0)
+            {
+                reply.PromptTokens = prompt;
+                reply.CompletionTokens = completion;
+                reply.HasUsage = true;
+            }
+        }
+
+        static readonly string[] ContextErrorMarkers =
+        {
+            "context window", "insufficient context", "maximum context", "context length",
+            "too many tokens", "token count", "exceeds the context", "zu viele tokens", "kontext"
+        };
+
+        public static bool IsContextError(string error)
+        {
+            if (string.IsNullOrEmpty(error)) return false;
+            foreach (var marker in ContextErrorMarkers)
+                if (error.Contains(marker, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         static async Task<string> SafeTextAsync(HttpResponseMessage response)
@@ -783,6 +842,9 @@ namespace NovaNote
             [JsonPropertyName("messages")] public List<ChatMessageDto> Messages { get; set; } = new List<ChatMessageDto>();
             [JsonPropertyName("stream")] public bool Stream { get; set; }
             [JsonPropertyName("temperature")] public double Temperature { get; set; }
+            [JsonPropertyName("max_tokens")] public int MaxTokens { get; set; }
+            [JsonPropertyName("stream_options")] public Dictionary<string, object> StreamOptions { get; set; }
+            [JsonPropertyName("options")] public Dictionary<string, object> Options { get; set; }
             [JsonPropertyName("tools")] public List<ToolDto> Tools { get; set; }
             [JsonPropertyName("tool_choice")] public string ToolChoice { get; set; }
         }

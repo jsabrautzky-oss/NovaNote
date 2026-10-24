@@ -21,7 +21,8 @@ namespace NovaNote
     {
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
-        public int ContextLength { get; set; } = 4096;
+        public int ContextLength { get; set; } = ContextBudget.FallbackContext;
+        public int? ContextOverride { get; set; }
         public bool Vision { get; set; }
         public bool? VisionOverride { get; set; }
         public bool SupportsTools { get; set; }
@@ -34,10 +35,17 @@ namespace NovaNote
         [JsonIgnore]
         public bool VisionEnabled => VisionOverride ?? Vision;
 
+        [JsonIgnore]
+        public int EffectiveContext => ContextOverride ?? ContextLength;
+
+        [JsonIgnore]
+        public bool ContextDetected => ContextOverride == null && ContextLength != ContextBudget.FallbackContext;
+
         public AiModel Clone() => new AiModel        {
             Id = Id,
             Name = Name,
             ContextLength = ContextLength,
+            ContextOverride = ContextOverride,
             Vision = Vision,
             VisionOverride = VisionOverride,
             SupportsTools = SupportsTools,
@@ -257,7 +265,8 @@ namespace NovaNote
                 if (existing != null)
                 {
                     if (!string.IsNullOrWhiteSpace(info.Name)) existing.Name = info.Name;
-                    if (info.ContextLength > 0) existing.ContextLength = info.ContextLength;
+                    if (info.ContextLength > 0 && existing.ContextOverride == null)
+                        existing.ContextLength = info.ContextLength;
                     existing.Vision = info.Vision;
                     existing.SupportsTools = info.SupportsTools;
                     existing.Available = true;
@@ -268,7 +277,7 @@ namespace NovaNote
                     {
                         Id = info.Id,
                         Name = string.IsNullOrWhiteSpace(info.Name) ? info.Id : info.Name,
-                        ContextLength = info.ContextLength > 0 ? info.ContextLength : 4096,
+                        ContextLength = info.ContextLength > 0 ? info.ContextLength : ContextBudget.FallbackContext,
                         Vision = info.Vision,
                         SupportsTools = info.SupportsTools,
                         Manual = false,

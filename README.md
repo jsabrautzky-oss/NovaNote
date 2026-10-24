@@ -2,8 +2,18 @@
 
 **Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-Aktuelle Version: **0.6.1**  
-GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.6.1
+Aktuelle Version: **0.7.0**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.7.0
+
+## Neu in 0.7.0
+- **Kontextgrenze pro Modell**: Tiktoken zählt die Prompt-Tokens exakt (o200k für `gpt-4o`/o-series, cl100k für andere OpenAI-kompatible Modelle); LM Studio/Ollama nutzen eine Heuristik und kalibrieren sie an den vom Server gemeldeten `usage`-Tokens. Der Scan erkennt jetzt auch Ollama-Kontexte (`ollama.context_length`), ohne Erkenntung gilt 4096 als „Annahme“
+- **Kontext manuell settingbar**: „KI-Einstellungen…“ hat ein Kontext-Feld pro Modell mit „manuell“-Schalter — manuell gesetzte Werte bleiben auch nach einem Scan stehen
+- **Kontext voll = automatisch kürzen**: die ältesten Nachrichten werden gekürzt (ein Tool-Aufruf und seine Ergebnisse bleiben zusammen), eine zu lange Nachricht bekommt einen Kürzungs-Marker, und ein Kontextfehler des Servers führt zu einem aggressiven Kürzen + erneuem Versuch; der Request sendet `max_tokens` (und für Ollama `options.num_ctx`) mit
+- **Kontext-Statusleiste unten im KI-Panel**: Füllbalken über Prompt-Tokens und Limit mit Prozentzahl der Auslastung (Accent/Warn/Rot), Antwort-Reserve und Limit-Herkunft im Tooltip
+- **Sprach-Tools**: `get_language` liest die aktuelle Dokument-Art, `set_language` stellt sie um (auch `md`, `py`, `cs`, `c#`, `js`, `yml`, `c++`); der ```nova```-Fallback für Modelle ohne native Tools kann beides ebenfalls
+- **Speichern nach Dokument-Art**: ein neues HTML-Dokument wird als `Unbenannt.html` vorgeschlagen (JSON, Markdown, CSS, JavaScript, C++, XML ebenso); der Filter listet alle Dokument-Arten und wählt die aktuelle voraus
+- **„KI denkt…“ als Dezent-Feld**: 1px-Rand mit rotierendem Farbverlauf (Cyan/Violet/Grün, theme-aware) und drei pulsierende Punkte, sanftes Ein- und Ausblenden; der Three.js-Effekt ist entfernt — der Chat braucht kein WebGL mehr
+- **Eingabe-Historie und Favoriten**: drei Icon-Buttons rechts neben der Eingabe (Stern, Liste, Zahnrad) — die letzten 10 Eingaben, Favoriten übernehmen den Text per Klick, der Favoriten-Dialog bearbeitet, ergänzt und löscht sie (persistiert in `ki-eingaben.json` und `ki-favoriten.json`)
 
 ## Neu in 0.6.1
 - Der letzte Tab schließt jetzt das Fenster (wie Chrome) — statt einen neuen leeren Tab zu erzeugen; „Alle Tabs schließen“ und `Strg+W` auf dem letzten Tab machen dasselbe
@@ -34,7 +44,7 @@ GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.6.1
 
 ## Neu in 0.5.0
 - **KI-Assistent im rechten Chat-Panel** (optional, standardmäßig geschlossen): Antworten, Suche, Zusammenfassung und Editor-Aktionen
-- **Tool-Calls**: Die KI liest das Dokument selbst (`get_document`, `search_document`, `goto_line`, `select_lines`) und ändert es (`replace_all_text`, `replace_lines`, `insert_at_line`, `syntax_check`, `format_code`); der Dokumenttext wird nicht automatisch geschickt — das spart Tokens. Änderungen erst auf „Übernehmen“ oder automatisch
+- **Tool-Calls**: Die KI liest das Dokument selbst (`get_document`, `search_document`, `goto_line`, `select_lines`), stellt die Dokument-Art um (`get_language`, `set_language` — z. B. Markdown für ein neues Gedicht) und ändert es (`replace_all_text`, `replace_lines`, `insert_at_line`, `syntax_check`, `format_code`); der Dokumenttext wird nicht automatisch geschickt — das spart Tokens. Änderungen erst auf „Übernehmen“ oder automatisch
 - **Anbieter-Verwaltung** mit Auto-Scan: Modelle, Kontextgröße, Vision und Tool-Support; Adresse und API-Key frei editierbar, API-Key per DPAPI verschlüsselt
 - **Text-Fallback** für Modelle ohne native Tools (```nova```-Block)
 - **Codeübernahme** aus Antwort-Codeblöcken, Multi-Turn-Chat, Abbrechen, Panel-Breite bleibt erhalten
@@ -42,6 +52,7 @@ GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.6.1
 
 ## Was kann NovaNote?
 - Dateien bearbeiten: `.txt`, `.md`, `.markdown`, `.py`, `.pyw`, `.cs`, `.csx`, `.yaml`, `.yml`, `.json`, `.jsonc`, `.json5`, `.xml`, `.xsl`, `.xhtml`, `.svg`, `.html`, `.htm`, `.css`, `.js`, `.mjs`, `.ts`, `.cpp`, `.c`, `.h`, `.hpp`
+- Speichern/Speichern unter: Dialog legt Name und Filter nach der Dokument-Art fest — ein neues HTML-Dokument wird als `Unbenannt.html` vorgeschlagen und „HTML“ ist im Filter vorausgewählt (bei JSON `Unbenannt.json`, bei Markdown `Unbenannt.md` …); die Endung wird ergänzt, wenn du keine schreibst
 - Syntax-Check mit roter Wellenlinie und `F4` für den nächsten Fehler
 - Rechtsklick-Menü: Aktionen erscheinen nur, wenn sie passen (Kopieren/Ausschneiden nur mit Auswahl, Einfügen nur mit Zwischenablage, JSON-/Code-Formatierung, Python-Completion, Markdown-Vorschau je nach Sprache)
 - Statusleiste: alles per Klick änderbar — Sprache (Menü, manuelle Auswahl schaltet „Automatisch erkennen“ aus), Encoding (UTF-8, UTF-8 mit BOM, UTF-16 LE/BE, ANSI), Zeilenende (Windows/Unix/Macintosh), Schriftgröße (Schieberegler 40–300 %) und Syntax-Check (Klick schaltet an/aus). Menüs und Regler folgen dem Theme (Dark Mode: dunkler Popup-Hintergrund, heller Text)
@@ -67,6 +78,8 @@ Ohne KI nutzt NovaNote nur den Editor — das Panel ist zu, es laufen keine Anfr
    Ohne gespeicherten Wert ist das Panel halb so breit wie das Fenster; nach dem Zerren am Trenner bleibt die Breite gespeichert.
 4. Die KI bekommt nur Dateiinfos (Name, Sprache, Zeilenzahl) als Systemprompt. Sie entscheidet selbst, ob sie über
    `get_document`/`search_document` im Dokument liest, und antwortet dann in Text oder ruft ein Bearbeitungs-Werkzeug auf.
+   Mit `get_language`/`set_language` liest und stellt sie die Dokument-Art um (z. B. `markdown` für ein neues Gedicht);
+   eine Setzung schaltet „Automatisch erkennen“ aus, wie die manuelle Sprachwahl in der Statusleiste.
 5. Editor-Aktionen werden standardmäßig erst nach „Bestätigen“ im Tool-Card ausgeführt; „KI → Aktionen automatisch anwenden“
    führt sie sofort aus. `Strg+Z` macht übernommene Änderungen rückgängig.
 6. Codeblöcke in der Antwort haben „Kopieren“ und „In Editor einfügen“; Einfügen setzt den Code am Cursor (bestehende Auswahl wird ersetzt).

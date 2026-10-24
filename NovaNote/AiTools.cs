@@ -18,7 +18,7 @@ namespace NovaNote
     {
         public static readonly string[] Names =
         {
-            "get_document", "search_document", "goto_line", "select_lines",
+            "get_document", "search_document", "get_language", "set_language", "goto_line", "select_lines",
             "replace_all_text", "replace_lines", "insert_at_line", "syntax_check", "format_code"
         };
 
@@ -38,6 +38,12 @@ namespace NovaNote
                       ("whole_word", "boolean", "Nur ganze Wörter"),
                       ("max_results", "integer", "Maximale Anzahl Treffer")
                 ), new[] { "pattern" }),
+            Def("get_language", "Aktuelle Dokument-Sprache (Art) zurückgeben, inkl. Automatik-Status und zulässiger Werte.",
+                Props()),
+            Def("set_language", "Dokument-Sprache (Art) umstellen, z. B. markdown für Markdown, python für Python-Code; " +
+                "vor dem Schreiben von Markdown/Code in eine neue Datei nötig. Schaltet die Sprach-Automatik aus.",
+                Props(("language", "string", $"Zielsprache: {DocLanguages.AllowedNames} (auch md, py, cs, c#, js, yml, c++)")),
+                new[] { "language" }),
             Def("replace_all_text", "Gesamten Dokumenttext durch den übergebenen Code ersetzen.",
                 Props(("code", "string", "Neuer vollständiger Text")), new[] { "code" }),
             Def("replace_lines", "Ein Zeileninterval im Dokument ersetzen.",
@@ -115,6 +121,29 @@ namespace NovaNote
                         sb.Append($"\nZeile {line}, Spalte {col}: {snippet}");
                     }
                     return sb.ToString();
+                }
+
+                case "get_language":
+                {
+                    var extLang = DocLanguages.FromExtension(view.Path_);
+                    string ext = extLang != DocLanguage.None && extLang != view.Lang
+                        ? $" · per Dateiendung: {DocLanguages.DisplayName(extLang)}"
+                        : "";
+                    return $"{view.TabTitle} · Sprache: {view.StatusLanguage} · " +
+                           $"Automatik {(SessionStore.Prefs.LanguageAuto ? "an" : "aus")}{ext}\n" +
+                           $"Zulässig: {DocLanguages.AllowedNames}";
+                }
+
+                case "set_language":
+                {
+                    string wanted = Str(args, "language", "");
+                    var lang = DocLanguages.Parse(wanted);
+                    if (lang == null)
+                        return $"Unbekannte Sprache: {wanted} (zulässig: {DocLanguages.AllowedNames})";
+                    SessionStore.Prefs.LanguageAuto = false;
+                    SessionStore.SavePrefs();
+                    view.SetLanguage(lang.Value);
+                    return $"Sprache auf {DocLanguages.DisplayName(lang.Value)} gesetzt (Automatik aus).";
                 }
 
                 case "goto_line":

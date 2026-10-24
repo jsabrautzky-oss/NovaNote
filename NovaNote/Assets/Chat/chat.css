@@ -16,6 +16,10 @@
   --err: #C62828;
   --warn: #B26A00;
   --user-bg: #EAEAEA;
+  --c1: #005FB8;
+  --c2: #8A6BB8;
+  --c3: #2E7D32;
+  --glow: rgba(0, 95, 184, 0.22);
 }
 
 html.dark {
@@ -36,6 +40,10 @@ html.dark {
   --err: #FF5555;
   --warn: #E3B04B;
   --user-bg: #272727;
+  --c1: #4CC2FF;
+  --c2: #C586C0;
+  --c3: #7FD48A;
+  --glow: rgba(76, 194, 255, 0.22);
 }
 
 html, body { height: 100%; }
@@ -47,10 +55,13 @@ body {
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.45;
+  display: flex;
+  flex-direction: column;
 }
 
 #log {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px 10px 12px;
   box-sizing: border-box;
@@ -217,10 +228,56 @@ body {
 .tactions { display: flex; gap: 6px; margin-top: 6px; }
 .tactions button { flex: 1; font-size: 12px; padding: 4px 10px; }
 
+@property --a {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
 .busy {
+  flex: 0 0 auto;
+  padding: 6px 10px 10px;
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+  pointer-events: none;
+}
+.busy[hidden] { display: none; }
+.busy.on { opacity: 1; transform: none; }
+
+.busy .frame {
+  width: 320px;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 1px;
+  border-radius: 11px;
+  background: conic-gradient(from var(--a), var(--c1), var(--c2), var(--c3), var(--c1));
+  filter: drop-shadow(0 0 7px var(--glow));
+  animation: spinhue 5s linear infinite;
+}
+@keyframes spinhue { to { --a: 360deg; } }
+
+.busy .panel {
+  border-radius: 10px;
+  background: var(--card);
+  padding: 7px 12px;
   color: var(--subtle);
   font-size: 11.5px;
-  padding: 4px 10px 8px;
+}
+.busy .line { display: flex; align-items: center; gap: 8px; }
+.busy .dots { display: flex; gap: 4px; }
+.busy .dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--c1);
+  animation: dotpulse 1.2s ease-in-out infinite;
+}
+.busy .dots i:nth-child(2) { background: var(--c2); animation-delay: 0.2s; }
+.busy .dots i:nth-child(3) { background: var(--c3); animation-delay: 0.4s; }
+@keyframes dotpulse {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
 }
 
 .jump {

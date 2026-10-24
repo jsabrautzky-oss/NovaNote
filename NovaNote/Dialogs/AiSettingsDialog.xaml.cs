@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace NovaNote
 {
@@ -129,7 +130,9 @@ namespace NovaNote
                     {
                         Name = m.DisplayName,
                         Id = m.Id,
-                        Context = m.ContextLength.ToString(),
+                        Context = m.ContextOverride.HasValue
+                            ? $"{m.EffectiveContext} (manuell)"
+                            : (m.ContextDetected ? m.EffectiveContext.ToString() : $"{m.EffectiveContext} (Annahme)"),
                         Vision = m.VisionOverride.HasValue
                             ? (m.VisionEnabled ? "Ja (manuell)" : "Nein (manuell)")
                             : (m.Vision ? "Ja" : "Nein"),
@@ -155,7 +158,76 @@ namespace NovaNote
             _loading = true;
             VisionBox.IsChecked = model?.VisionOverride == true;
             VisionBox.IsEnabled = has;
+            ContextBox.Text = model == null ? "" : model.EffectiveContext.ToString();
+            ContextBox.IsEnabled = has;
+            ContextManualBox.IsChecked = model?.ContextOverride.HasValue == true;
+            ContextManualBox.IsEnabled = has;
             _loading = false;
+        }
+
+        void CommitContext()
+        {
+            if (_loading || _current == null) return;
+            var row = ModelList.SelectedItem as AiModelRow;
+            if (row == null) return;
+            var model = _current.Models.FirstOrDefault(m => m.Id == row.Id);
+            if (model == null) return;
+            if (!int.TryParse(ContextBox.Text.Trim(), out int ctx) || ctx < 256)
+            {
+                StatusText.Text = "Kontext muss eine Zahl ab 256 Tokens sein.";
+                return;
+            }
+            if (ContextManualBox.IsChecked == true)
+            {
+                model.ContextOverride = ctx;
+                StatusText.Text = $"Kontext für \"{row.Name}\" auf {ctx} Tokens festgelegt (Scan überschreibt ihn nicht).";
+            }
+            else
+            {
+                model.ContextOverride = null;
+                model.ContextLength = ctx;
+                StatusText.Text = $"Kontext für \"{row.Name}\" auf {ctx} Tokens gesetzt — ein Scan kann den Wert ersetzen.";
+            }
+            RefreshModels();
+        }
+
+        void ContextBox_LostFocus(object sender, RoutedEventArgs e) => CommitContext();
+
+        void ContextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                CommitContext();
+                e.Handled = true;
+            }
+        }
+
+        void ContextManual_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _current == null) return;
+            var row = ModelList.SelectedItem as AiModelRow;
+            if (row == null) return;
+            var model = _current.Models.FirstOrDefault(m => m.Id == row.Id);
+            if (model == null) return;
+            if (ContextManualBox.IsChecked == true)
+            {
+                if (int.TryParse(ContextBox.Text.Trim(), out int ctx) && ctx >= 256)
+                {
+                    model.ContextOverride = ctx;
+                    StatusText.Text = $"Kontext für \"{row.Name}\" manuell auf {ctx} Tokens festgelegt.";
+                }
+                else
+                {
+                    model.ContextOverride = model.ContextLength;
+                    StatusText.Text = $"Kontext für \"{row.Name}\" manuell auf {model.ContextLength} Tokens festgelegt.";
+                }
+            }
+            else
+            {
+                model.ContextOverride = null;
+                StatusText.Text = $"Kontext für \"{row.Name}\" folgt wieder der Erkennung ({model.ContextLength} Tokens).";
+            }
+            RefreshModels();
         }
 
         void VisionBox_Click(object sender, RoutedEventArgs e)
@@ -243,6 +315,7 @@ namespace NovaNote
                 Id = id,
                 Name = NewNameBox.Text.Trim(),
                 ContextLength = ctx,
+                ContextOverride = ctx,
                 Vision = NewVisionBox.IsChecked == true,
                 VisionOverride = NewVisionBox.IsChecked == true ? true : (bool?)null,
                 SupportsTools = NewToolsBox.IsChecked == true,

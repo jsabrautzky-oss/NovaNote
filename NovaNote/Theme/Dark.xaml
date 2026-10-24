@@ -11,6 +11,7 @@
     <Color x:Key="PopupHoverColor">#393939</Color>
     <Color x:Key="AccentColor">#4CC2FF</Color>
     <Color x:Key="AccentFgColor">#000000</Color>
+    <Color x:Key="WarnColor">#E0A03C</Color>
     <Color x:Key="SelectionColor">#594CC2FF</Color>
     <Color x:Key="DividerColor">#2E2E2E</Color>
     <Color x:Key="ButtonBgColor">#2C2C2C</Color>
@@ -34,6 +35,7 @@
     <SolidColorBrush x:Key="PopupHoverBrush" Color="{DynamicResource PopupHoverColor}"/>
     <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
     <SolidColorBrush x:Key="AccentFgBrush" Color="{DynamicResource AccentFgColor}"/>
+    <SolidColorBrush x:Key="WarnBrush" Color="{DynamicResource WarnColor}"/>
     <SolidColorBrush x:Key="SelectionBrush" Color="{DynamicResource SelectionColor}"/>
     <SolidColorBrush x:Key="DividerBrush" Color="{DynamicResource DividerColor}"/>
     <SolidColorBrush x:Key="ButtonBgBrush" Color="{DynamicResource ButtonBgColor}"/>

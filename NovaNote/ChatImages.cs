@@ -20,6 +20,8 @@ namespace NovaNote
         public const int MaxEdge = 2048;
         public const int MaxImages = 6;
         public const long MaxBytes = 6L * 1024 * 1024;
+        public const int TokenBlockEdge = 512;
+        public const int TokensPerBlock = 64;
 
         static readonly HashSet<string> Supported = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -175,5 +177,17 @@ namespace NovaNote
 
         static string DataUri(string mime, byte[] bytes) =>
             "data:" + mime + ";base64," + Convert.ToBase64String(bytes);
+
+        public static int EstimateTokens(ChatImage image)
+        {
+            if (image == null) return 0;
+            int w = image.Thumbnail?.PixelWidth ?? 0;
+            int h = image.Thumbnail?.PixelHeight ?? 0;
+            if (w <= 0 || h <= 0)
+                return Math.Clamp((int)(image.Bytes / 400), 48, 1200);
+            int blocks = Math.Max(1, (int)Math.Ceiling(w / (double)TokenBlockEdge)) *
+                         Math.Max(1, (int)Math.Ceiling(h / (double)TokenBlockEdge));
+            return Math.Clamp(blocks * TokensPerBlock, TokensPerBlock, 2048);
+        }
     }
 }

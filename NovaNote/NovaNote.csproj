@@ -11,10 +11,10 @@
     <StartupObject>NovaNote.Program</StartupObject>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>novanote.ico</ApplicationIcon>
-    <VersionPrefix>0.6.1</VersionPrefix>
-    <Version>0.6.1</Version>
-    <AssemblyVersion>0.6.1.0</AssemblyVersion>
-    <FileVersion>0.6.1.0</FileVersion>
+    <VersionPrefix>0.7.0</VersionPrefix>
+    <Version>0.7.0</Version>
+    <AssemblyVersion>0.7.0.0</AssemblyVersion>
+    <FileVersion>0.7.0.0</FileVersion>
     <UseWindowsForms>false</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
@@ -27,7 +27,10 @@
     <PackageReference Include="MdXaml" Version="1.27.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.11" />
+        <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.11" />
+        <PackageReference Include="Tiktoken.Core" Version="3.1.5" />
+        <PackageReference Include="Tiktoken.Encodings.cl100k" Version="3.1.5" />
+        <PackageReference Include="Tiktoken.Encodings.o200k" Version="3.1.5" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.11" />
     <PackageReference Include="Velopack" Version="1.2.161" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />

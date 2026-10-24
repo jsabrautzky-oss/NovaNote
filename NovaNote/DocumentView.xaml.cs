@@ -1466,8 +1466,8 @@ namespace NovaNote
             string ext = CurrentSaveExtension();
             var dlg = new SaveFileDialog
             {
-                Filter = "Textdokumente (*.txt)|*.txt|Markdown (*.md)|*.md|Python (*.py)|*.py|C# (*.cs)|*.cs|YAML (*.yaml)|*.yaml;*.yml|Alle Dateien (*.*)|*.*",
-                FilterIndex = 1,
+                Filter = DocLanguages.Filter,
+                FilterIndex = DocLanguages.FilterIndex(Lang),
                 DefaultExt = ext,
                 AddExtension = true,
                 FileName = Path_ == null ? $"Unbenannt.{ext}" : System.IO.Path.GetFileName(Path_)
@@ -1487,14 +1487,7 @@ namespace NovaNote
                 string ext = System.IO.Path.GetExtension(Path_);
                 if (ext.Length > 1) return ext.Substring(1);
             }
-            switch (Lang)
-            {
-                case DocLanguage.Markdown: return "md";
-                case DocLanguage.Python: return "py";
-                case DocLanguage.CSharp: return "cs";
-                case DocLanguage.Yaml: return "yaml";
-                default: return "txt";
-            }
+            return DocLanguages.Extension(Lang);
         }
 
         public bool WriteFile(string path)

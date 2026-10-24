@@ -1,7 +1,48 @@
 # Changelog
+<!-- Konvention: eine Bullet = eine Änderung, ein Zeile, kurz. Präfix FEAT | FIX | CHORE | TEST (+ Bereich, z. B. ki/save/ui/harness).
+     Die Zeile "Kurz: …" unter jeder Überschrift ist die einzeilige Summary; release.ps1 baut daraus die GitHub-Release-Notes. -->
+
+## 0.7.0
+Kurz: Die KI kennt die Dokument-Art und kann sie umstellen; der Speicher-Dialog legt die passende Endung fest; die „KI denkt…“-Zeile blendet dezent ein; der KI-Chat bekommt Eingabe-Historie und Favoriten; die Kontextgröße des Modells wird erkannt, berücksichtigt und als Füllbalken angezeigt.
+
+### Neue Features
+- FEAT ki: `get_language`/`set_language` — die KI liest die aktuelle Dokument-Art und stellt sie um (auch Aliases wie `md`, `py`, `cs`, `c#`, `js`, `yml`, `c++`)
+- FEAT ki: Der ```nova```-Text-Fallback für Modelle ohne native Tools erlaubt zusätzlich `get_language` und `set_language`
+- FEAT save: `Speichern`/`Speichern unter` legt Name und Endung nach der Dokument-Art fest — ein neues HTML-Dokument wird als `Unbenannt.html` vorgeschlagen, JSON als `Unbenannt.json`, CSS als `Unbenannt.css`, JavaScript als `Unbenannt.js`, C++ als `Unbenannt.cpp`, XML als `Unbenannt.xml`; vorher gab es für alle diese Arten nur `Unbenannt.txt`
+- FEAT save: Der Filter des Speichern-Dialogs listet alle Dokument-Arten (Text, Markdown, JSON, XML, HTML, CSS, JavaScript, C++, Python, C#, YAML, Alle Dateien) und wählt die aktuelle Art voraus; der Öffnen-Dialog listet denselben Filter, „Textdokumente“ bleibt vorausgewählt
+- FEAT chat: Dezent-Denkfeld am Chat-Ende — 1px-Rand mit rotierendem Farbverlauf (Cyan/Violet/Grün, theme-aware) um „KI denkt“, dazu drei pulsierende Punkte; blendet sanft ein (0.55 s) und nach dem Denken per Fade-Out wieder aus (0.6 s bis `hidden`)
+- CHORE chat: Der Three.js-Canvas-Effekt ist entfernt — `chat-wave.js` und `three.module.min.js` sind nicht mehr im Paket, der Chat braucht kein WebGL mehr
+- FEAT ki: Das Eingabefeld ist eine Zeile höher und schmaler; rechts daneben stehen drei Icon-Buttons untereinander (Stern, Liste, Zahnrad)
+- FEAT ki: Favoriten-Popup am Stern-Button — jeder Favorit übernimmt per Klick den Text in das Eingabefeld
+- FEAT ki: Historie-Popup am Liste-Button — die letzten 10 Eingaben; der Stern macht eine Eingabe zum Favoriten (gelb gefüllt, zweiter Klick entfernt ihn), Klick auf den Text übernimmt ihn, „Verlauf leeren“ löscht nur die Eingaben
+- FEAT ki: Favoriten-Dialog am Zahnrad-Button — Favoriten ansehen, bearbeiten, neu anlegen und löschen; persistiert in `ki-eingaben.json` und `ki-favoriten.json`
+- FEAT ki: Der Favoriten-Dialog öffnet mittig über dem KI-Panel statt beliebig auf dem Bildschirm
+- CHORE ki: Favoriten- und Historie-Popup nutzen die volle Breite des KI-Panels bis zum rechten Rand
+- FEAT ki: Kontextgrenze pro Modell — Tiktoken zählt die Prompt-Tokens exakt (o200k für `gpt-4o`/o-series, cl100k für andere OpenAI-kompatible Modelle), LM Studio/Ollama nutzen eine Heuristik und kalibrieren sie an den vom Server gemeldeten `usage`-Tokens
+- FEAT ki: Der Scan erkennt die Kontextgröße jetzt auch bei Ollama (`ollama.context_length` in `model_info`); ohne Erkenntung gilt 4096 als „Annahme“ in der Statuszeile
+- FEAT ki: „KI-Einstellungen…“ hat ein Kontext-Feld pro Modell mit „manuell“-Schalter — manuell gesetzte Werte bleiben auch nach einem Scan stehen
+- FEAT chat: Kontext-Statusleiste unten im KI-Panel — Füllbalken über Prompt-Tokens und Limit (Accent, Warn, Rot), Prozentzahl der Auslastung statt Tokenizer-Name, Tooltip mit Antwort-Reserve, Limit-Herkunft und Zählquelle
+
+### Geändert
+- CHORE ki: Der Systemprompt nennt die aktuelle Dokument-Art und weist auf `set_language` vor dem Schreiben eines Markdown-/Code-Dokuments hin
+- CHORE ki: `set_language` schaltet „Automatisch erkennen“ (`Prefs.LanguageAuto`) aus und aktualisiert Statusleiste und Sprach-Menü — wie die manuelle Sprachwahl
+- FIX chat: Die „KI denkt…“-Zeile lag durch `#log { height: 100% }` unter dem View und war unsichtbar — `body` ist jetzt Flex-Column mit `#log { flex: 1 }`, das Denkfeld bleibt unten im Viewport sichtbar
+- FIX ki: Eine unbekannte Sprache wird als Tool-Fehler gezeigt („Unbekannte Sprache: …“) statt als normaler Tool-Text
+- TEST harness: Der UI-Harness prüft die beiden Sprach-Tools, den Dialog-Filter (Label und Index je Art) und die Speicher-Endung
+- TEST harness: Der Chat-Frontend-Test prüft das Denkfeld — class `on` nach `setBusy(true)`, drei Punkte, Viewport und Fade-Out (`hidden` erst nach der Transition)
+- TEST harness: Der Chat-Frontend-Test speichert einen `CapturePreviewAsync`-PNG als visuellen Beleg des busy-Zustands
+- TEST harness: Der UI-Harness prüft die drei Icon-Buttons neben der Eingabe, die Historie nach `AiSendAsync`, den Stern-Toggle und „Verlauf leeren" (Favoriten bleiben) sowie den Favoriten-Dialog
+- FIX ki: Ist der Kontext voll, kürzt der Chat automatisch die ältesten Nachrichten (ein Tool-Aufruf und seine Ergebnisse bleiben zusammen), kürzt eine zu lange Nachricht mit Marker und meldet die Kürzung als Info-Zeile im Chat
+- FIX ki: Der Request sendet `max_tokens` (OpenAI-kompatibel) und für Ollama zusätzlich `options.num_ctx`; meldet der Server einen Kontextfehler, wird einmal aggressiv gekürzt und erneut versucht statt mehrfach fehlerhaft
+- TEST harness: Neuer `context`-Modus prüft Token-Schätzung, Budget-Kürzung, Override-Persistenz, Ollama-Kontext-Erkennung sowie `usage`, `max_tokens` und `num_ctx`
+- TEST harness: Der UI-Harness prüft die Kontext-Statusleiste (Zeile 6, Balken-Limit, Prozent-Chip), die automatische Kürzung im gesendeten Prompt und das Kontext-Feld im KI-Einstellungsdialog
+- CHORE chat: Der Chip rechts in der Kontextleiste zeigt die Prozentzahl der Auslastung statt „exakt (cl100k)“ oder „geschätzt“ — die Zählquelle steht nur noch im Tooltip
+
+### Paket
+- Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.7.0-full.nupkg`, Delta von 0.6.1 (`NovaNote-0.7.0-delta.nupkg`)
 
 ## 0.6.1
-Tab-Schließen verhält sich wie im Browser, und „nicht gespeichert" bleibt erhalten.
+Kurz: Tab-Schließen verhält sich wie im Browser, und „nicht gespeichert“ bleibt erhalten.
 
 - Schließt man den letzten Tab, wird das Fenster geschlossen (wie Chrome) — statt einen neuen leeren Tab zu erstellen; „Alle Tabs schließen“ und `Strg+W` auf dem letzten Tab machen dasselbe
 - Bugfix: „Nein“ im Speichern-Dialog behält den „nicht gespeichert“-Status des Tabs — die Session speichert `Dirty` und der wiederhergestellte Tab bleibt mit Punkt markiert und wird beim nächsten Schließen erneut gefragt (vorher ging der Status beim Schließen verloren)
@@ -12,7 +53,7 @@ Tab-Schließen verhält sich wie im Browser, und „nicht gespeichert" bleibt er
 - Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.6.1-full.nupkg`, Delta von 0.6.0 (`NovaNote-0.6.1-delta.nupkg`)
 
 ## 0.6.0
-Der KI-Chat kann Bilder (Vision) — nur wenn das aktive Modell Bilder versteht. Die Statusleiste ist per Klick bedienbar, Kontext-Menüs und Schieberegler folgen dem Theme (Dark Mode), und beim Schließen wird jeder ungespeicherte Tab einzeln mit Fokus abgefragt.
+Kurz: Der KI-Chat kann Bilder (Vision) — nur wenn das aktive Modell Bilder versteht; Statusleiste per Klick, Menüs und Regler gethemt, jeder ungespeicherte Tab wird einzeln mit Fokus abgefragt.
 
 ### Neue Features
 - Bildanhänge im Chat: `+`-Button mit `OpenFileDialog` (Mehrfachauswahl), Drag & Drop von Bilddateien auf das Eingabefeld und `Strg+V` für Screenshots aus der Zwischenablage
@@ -37,7 +78,7 @@ Der KI-Chat kann Bilder (Vision) — nur wenn das aktive Modell Bilder versteht.
 - Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.6.0-full.nupkg`, Delta von 0.5.2 (`NovaNote-0.6.0-delta.nupkg`)
 
 ## 0.5.2
-Das KI-Chat-Panel rendert Antworten jetzt in WebView2 (HTML/JS) statt als nackter Text.
+Kurz: Das KI-Chat-Panel rendert Antworten in WebView2 (Markdown, Streaming, Tool-Cards mit Bestätigen/Verwerfen) statt als nackter Text.
 
 ### Neue Features
 - Chat-Panel nutzt `Microsoft.Web.WebView2` mit lokalem Frontend `NovaNote/Assets/Chat/` (`chat.html`, `chat.css`, `chat.js`, vendored `marked.min.js` und `highlight.min.js`); geladen über `SetVirtualHostNameToFolderMapping("novanote.chat", …)`, offline ohne CDN
@@ -62,7 +103,7 @@ Das KI-Chat-Panel rendert Antworten jetzt in WebView2 (HTML/JS) statt als nackte
 - `Microsoft.Web.WebView2` und `WebView2Loader.dll` sind im Paket enthalten; das Chat-Frontend liegt in `Assets\Chat\`
 
 ## 0.5.1
-Bugfix-Release: Der Update-Setup konnte nicht gestartet werden („Datei wird von einem anderen Prozess verwendet“), weil der Download die Datei beim Start noch offen hielt.
+Kurz: Bugfix — das Update-Setup ließ sich nicht starten („Datei wird von einem anderen Prozess verwendet“), weil der Download die Datei beim Start offen hielt.
 
 ### Behoben / Fixes
 - `UpdateService.DownloadSetupAsync` schließt alle Download-Streams, bevor `LaunchSetup` das Setup startet; der Update-Dialog „Update prüfen → Herunterladen“ funktioniert wieder
@@ -74,7 +115,7 @@ Bugfix-Release: Der Update-Setup konnte nicht gestartet werden („Datei wird vo
 - Delta-Paket von 0.5.0 (klein, nur geänderte Dateien)
 
 ## 0.5.0
-NovaNote 0.5.0 ist die erste Release-Version mit der optionalen lokalen KI-Anbindung: Editor ohne Cloud-Zwang, KI nur gegen den eigenen Server.
+Kurz: Erste Version mit der optionalen lokalen KI-Anbindung — Editor ohne Cloud-Zwang, KI nur gegen den eigenen Server.
 
 ### Neue Features
 - Lokales KI-Panel rechts im Fenster mit GridSplitter, Toggle über „KI → KI-Panel“ oder `Strg+Alt+K`; die Panel-Breite wird nach dem Zerren am Trenner in den Einstellungen gespeichert (`AiPanelWidth`, 180–720 px)
@@ -124,7 +165,7 @@ NovaNote 0.5.0 ist die erste Release-Version mit der optionalen lokalen KI-Anbin
 - Dateiendungen: `.txt`, `.md`, `.markdown`, `.json`, `.xml`, `.html` über ProgID `NovaNote.Editor`
 
 ## 0.2.0-beta
-Beta mit Markdown, Python, C# und YAML.
+Kurz: Beta mit Markdown, Python, C# und YAML (Highlighting, Syntax-Check, Formatierung, Folding).
 
 ### Neue Features
 - Syntax-Highlighting für Markdown, Python, C# und YAML (Markdown/YAML über eigene XSHD-Definitionen im Assembly)
@@ -160,7 +201,7 @@ Beta mit Markdown, Python, C# und YAML.
 - Kontextmenü bleibt offen und blendet unpassende Einträge aus.
 
 ## 0.1.0-beta
-Erste öffentliche Beta-Version von NovaNote.
+Kurz: Erste öffentliche Beta — WPF-Editor auf AvalonEdit mit Highlighting, Syntax-Check, Folding, Mehrfach-Tabs und Themes.
 
 ### Features
 - WPF-Editor auf Basis von AvalonEdit

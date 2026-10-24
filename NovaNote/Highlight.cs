@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 
 namespace NovaNote
 {
@@ -19,6 +20,47 @@ namespace NovaNote
 
     public static class DocLanguages
     {
+        static readonly (DocLanguage Lang, string Label, string Pattern, string Ext)[] Kinds =
+        {
+            (DocLanguage.None, "Textdokumente", "*.txt", "txt"),
+            (DocLanguage.Markdown, "Markdown", "*.md;*.markdown", "md"),
+            (DocLanguage.Json, "JSON", "*.json;*.jsonc;*.json5", "json"),
+            (DocLanguage.Xml, "XML", "*.xml;*.xsl;*.xhtml;*.svg", "xml"),
+            (DocLanguage.Html, "HTML", "*.html;*.htm", "html"),
+            (DocLanguage.Css, "CSS", "*.css", "css"),
+            (DocLanguage.JavaScript, "JavaScript", "*.js;*.mjs;*.ts", "js"),
+            (DocLanguage.Cpp, "C++", "*.cpp;*.cc;*.cxx;*.c;*.h;*.hpp", "cpp"),
+            (DocLanguage.Python, "Python", "*.py;*.pyw", "py"),
+            (DocLanguage.CSharp, "C#", "*.cs;*.csx", "cs"),
+            (DocLanguage.Yaml, "YAML", "*.yaml;*.yml", "yaml")
+        };
+
+        public static string Filter
+        {
+            get
+            {
+                var sb = new StringBuilder();
+                foreach (var k in Kinds)
+                    sb.Append($"{k.Label} ({k.Pattern})|{k.Pattern}|");
+                sb.Append("Alle Dateien (*.*)|*.*");
+                return sb.ToString();
+            }
+        }
+
+        public static int FilterIndex(DocLanguage lang)
+        {
+            for (int i = 0; i < Kinds.Length; i++)
+                if (Kinds[i].Lang == lang) return i + 1;
+            return 1;
+        }
+
+        public static string Extension(DocLanguage lang)
+        {
+            foreach (var k in Kinds)
+                if (k.Lang == lang) return k.Ext;
+            return "txt";
+        }
+
         public static DocLanguage FromExtension(string path)
         {
             if (string.IsNullOrEmpty(path)) return DocLanguage.None;
@@ -74,6 +116,55 @@ namespace NovaNote
                 catch { return DocLanguage.None; }
             }
             return DocLanguage.None;
+        }
+
+        public static string AllowedNames =>
+            "text, json, xml, html, css, javascript, cpp, markdown, python, csharp, yaml";
+
+        public static DocLanguage? Parse(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            switch (name.Trim().ToLowerInvariant())
+            {
+                case "text":
+                case "plain":
+                case "plain text":
+                case "plaintext":
+                case "none":
+                case "no language":
+                case "nolang":
+                case "null": return DocLanguage.None;
+                case "json":
+                case "jsonc":
+                case "json5": return DocLanguage.Json;
+                case "xml":
+                case "xsl":
+                case "svg": return DocLanguage.Xml;
+                case "html":
+                case "htm": return DocLanguage.Html;
+                case "css": return DocLanguage.Css;
+                case "javascript":
+                case "js":
+                case "ts":
+                case "typescript": return DocLanguage.JavaScript;
+                case "cpp":
+                case "c++":
+                case "c":
+                case "cc":
+                case "cxx": return DocLanguage.Cpp;
+                case "markdown":
+                case "md": return DocLanguage.Markdown;
+                case "python":
+                case "py":
+                case "pyw": return DocLanguage.Python;
+                case "csharp":
+                case "c#":
+                case "cs":
+                case "csx": return DocLanguage.CSharp;
+                case "yaml":
+                case "yml": return DocLanguage.Yaml;
+                default: return null;
+            }
         }
 
         public static string DisplayName(DocLanguage lang)

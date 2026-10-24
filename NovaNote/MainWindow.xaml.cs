@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
@@ -63,8 +64,12 @@ namespace NovaNote
         string _aiPendingChatId;
         int _aiPendingRound;
         AiSettingsDialog _aiDlg;
+        FavoritesDialog _favDlg;
         readonly ObservableCollection<ChatImage> _attachments = new ObservableCollection<ChatImage>();
         DateTime _lastDropHint;
+        int _tokenShown;
+        string _tokenMode = "geschätzt";
+        bool _contextRetried;
 
         static CoreWebView2Environment _chatEnv;
         static readonly JsonSerializerOptions ChatJson = new JsonSerializerOptions
@@ -95,6 +100,7 @@ namespace NovaNote
             InitializeComponent();
             ThemeService.AttachWindow(this);
             ThemeService.ThemeChanged += OnThemeChanged;
+            KiHistory.Load();
             Closed += (s, e) => ThemeService.ThemeChanged -= OnThemeChanged;
             SetupBindings();
             BuildStatusLanguageMenu();
@@ -336,8 +342,8 @@ namespace NovaNote
         {
             var dlg = new OpenFileDialog
             {
-                Filter = "Textdokumente (*.txt)|*.txt|Markdown (*.md)|*.md|Python (*.py)|*.py|C# (*.cs)|*.cs|YAML (*.yaml)|*.yaml;*.yml|Alle Dateien (*.*)|*.*",
-                FilterIndex = 1
+                Filter = DocLanguages.Filter,
+                FilterIndex = DocLanguages.FilterIndex(DocLanguage.None)
             };
             var p = ActiveView?.Path_;
             if (p != null) dlg.InitialDirectory = Path.GetDirectoryName(Path.GetFullPath(p));
@@ -1263,6 +1269,7 @@ namespace NovaNote
                 AiStatus.Text = "KI: kein Anbieter erfasst";
                 AiStatus.ToolTip = "KI → KI-Einstellungen…";
                 UpdateAiAttachUi();
+                UpdateTokenBar();
                 return;
             }
             if (model == null)
@@ -1270,15 +1277,83 @@ namespace NovaNote
                 AiStatus.Text = $"KI: {provider.Name} · kein Modell · KI → Modelle scannen";
                 AiStatus.ToolTip = provider.BaseUrl;
                 UpdateAiAttachUi();
+                UpdateTokenBar();
                 return;
             }
             string vision = model.VisionOverride.HasValue
                 ? (model.VisionEnabled ? "Ja (manuell)" : "Nein (manuell)")
                 : (model.Vision ? "Ja" : "Nein");
-            AiStatus.Text = $"KI: {provider.Name} · {model.DisplayName} · Kontext {model.ContextLength} · " +
+            string ctx = model.ContextOverride.HasValue
+                ? $"{model.EffectiveContext} (manuell)"
+                : (model.ContextDetected ? model.EffectiveContext.ToString() : $"{model.EffectiveContext} (Annahme)");
+            AiStatus.Text = $"KI: {provider.Name} · {model.DisplayName} · Kontext {ctx} · " +
                             $"Vision {vision} · Tools {(model.SupportsTools ? "Ja" : "Nein")}";
             AiStatus.ToolTip = $"{provider.BaseUrl} · Modell-ID {model.Id}";
+            if (_aiMessages.Count > 0 && _tokenMode != "exakt (Server)")
+            {
+                _tokenShown = ContextBudget.Count(_aiMessages, provider, model);
+                _tokenMode = ContextBudget.ModeLabel(ContextBudget.KindFor(provider, model));
+            }
             UpdateAiAttachUi();
+            UpdateTokenBar();
+        }
+
+        static string FmtTokens(int n)
+        {
+            if (n < 1000) return n.ToString();
+            return (n / 1000.0).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("de-DE")) + "k";
+        }
+
+        Brush FindBrush(string key)
+        {
+            try { return FindResource(key) as Brush; }
+            catch { return null; }
+        }
+
+        Brush TokenBrushFor(double ratio)
+        {
+            if (ratio >= 0.95) return FindBrush("SyntaxErrorBrush") ?? FindBrush("AccentBrush");
+            if (ratio >= 0.7) return FindBrush("WarnBrush") ?? FindBrush("AccentBrush");
+            return FindBrush("AccentBrush");
+        }
+
+        void UpdateTokenBar()
+        {
+            if (AiTokenBar == null) return;
+            var model = AiStore.ActiveProvider?.ActiveModel;
+            if (model == null)
+            {
+                AiTokenText.Text = "Kontext –";
+                AiTokenBar.Maximum = 1;
+                AiTokenBar.Value = 0;
+                AiTokenMode.Text = "0 %";
+                AiTokenBar.ToolTip = "Kein Modell gewählt.";
+                return;
+            }
+
+            int ctx = ContextBudget.ContextFor(model);
+            int shown = _tokenShown;
+            double ratio = ctx > 0 ? Math.Min(1.0, (double)shown / ctx) : 0;
+            AiTokenBar.Maximum = ctx;
+            AiTokenBar.Value = Math.Min(shown, ctx);
+            var brush = TokenBrushFor(ratio);
+            if (brush != null) AiTokenBar.Foreground = brush;
+            AiTokenText.Text = shown <= 0 ? "Kontext frei" : $"{FmtTokens(shown)} / {FmtTokens(ctx)} Kontext";
+            AiTokenMode.Text = $"{Math.Round(ratio * 100)} %";
+
+            string limit = model.ContextOverride.HasValue
+                ? $"{FmtTokens(ctx)} manuell gesetzt"
+                : (model.ContextDetected ? $"{FmtTokens(ctx)} erkannt" : $"{FmtTokens(ctx)} angenommen");
+            string tip = $"Prompt {shown} Tokens · Reserve {ContextBudget.Reserve(ctx)} für die Antwort · Limit {limit} · {_tokenMode}";
+            AiTokenBar.ToolTip = tip;
+            AiTokenMode.ToolTip = tip;
+        }
+
+        void PulseTokenBar()
+        {
+            if (AiTokenBar == null) return;
+            var anim = new DoubleAnimation(1.0, 0.35, TimeSpan.FromMilliseconds(140)) { AutoReverse = true };
+            AiTokenBar.BeginAnimation(UIElement.OpacityProperty, anim);
         }
 
         bool VisionReady() => AiStore.SupportsVision(AiStore.ActiveProvider?.ActiveModel);
@@ -1698,6 +1773,8 @@ namespace NovaNote
             sb.Append($"Du bist der KI-Assistent für NovaNote. Aktive Datei: {name} — {lang}, {lines} Zeilen");
             if (sel > 0) sb.Append($", {sel} Zeichen ausgewählt");
             sb.Append(".\n");
+            sb.Append($"Dokument-Art: {lang}. get_language zeigt die Art, set_language stellt sie um (z. B. markdown, python, csharp); " +
+                      "set_language vor dem Schreiben eines Markdown-/Code-Dokuments. format_code braucht python oder csharp.\n");
             if (imageCount > 0)
                 sb.Append($"Der Nutzer hat {imageCount} Bild(er) angehängt (image_url-Parts im content-Array); beschreibe sie bei Bedarf.\n");
             sb.Append("Der Dokumenttext wird nicht automatisch geschickt. Lies ihn bei Bedarf selbst über die Werkzeuge: ");
@@ -1710,21 +1787,46 @@ namespace NovaNote
             return sb.ToString();
         }
 
-        void TrimAiTranscript()
+        void TrimAiTranscript(AiProvider provider, AiModel model)
         {
-            var system = _aiMessages.FirstOrDefault(m => m.Role == "system");
-            var rest = _aiMessages.Where(m => m.Role != "system").ToList();
-            const int keep = 12;
-            if (rest.Count > keep) rest = rest.Skip(rest.Count - keep).ToList();
-            while (rest.Count > 0 && rest[0].Role == "tool") rest.RemoveAt(0);
+            var lastImage = _aiMessages.LastOrDefault(m => m.Role == "user" && m.Images != null && m.Images.Count > 0);
+            foreach (var m in _aiMessages)
+                if (m != lastImage && m.Images != null)
+                {
+                    m.Images = null;
+                    m.ImageTokens = 0;
+                }
 
-            var lastImage = rest.LastOrDefault(m => m.Role == "user" && m.Images != null && m.Images.Count > 0);
-            foreach (var m in rest)
-                if (m != lastImage && m.Images != null) m.Images = null;
-
+            var res = ContextBudget.ApplyBudget(provider, model, _aiMessages);
             _aiMessages.Clear();
-            if (system != null) _aiMessages.Add(system);
-            _aiMessages.AddRange(rest);
+            _aiMessages.AddRange(res.Messages);
+            _tokenShown = res.Tokens;
+            _tokenMode = ContextBudget.ModeLabel(ContextBudget.KindFor(provider, model));
+
+            int ctx = ContextBudget.ContextFor(model);
+            bool trimmed = res.DroppedMessages > 0 || res.DroppedImages > 0 || res.TruncatedText;
+            if (res.DroppedMessages > 0)
+                AppendAi($"Kontext voll ({FmtTokens(res.Tokens)} / {FmtTokens(ctx)} Tokens): {res.DroppedMessages} ältere Nachrichten gekürzt.");
+            if (res.DroppedImages > 0)
+                AppendAi($"Kontext voll: {res.DroppedImages} alte Bildanhänge entfernt.");
+            if (res.TruncatedText)
+                AppendAi("Kontext voll: die letzte Nachricht wurde gekürzt.");
+            if (trimmed) PulseTokenBar();
+            UpdateTokenBar();
+        }
+
+        void TrimAiHard(AiProvider provider, AiModel model)
+        {
+            var system = _aiMessages.Where(m => m.Role == "system").ToList();
+            var rest = _aiMessages.Where(m => m.Role != "system").ToList();
+            int keep = Math.Min(rest.Count, 4);
+            var kept = rest.Skip(rest.Count - keep).ToList();
+            while (kept.Count > 0 && kept[0].Role == "tool") kept.RemoveAt(0);
+            _aiMessages.Clear();
+            _aiMessages.AddRange(system);
+            _aiMessages.AddRange(kept);
+            _tokenShown = ContextBudget.Count(_aiMessages, provider, model);
+            UpdateTokenBar();
         }
 
         void SetAiBusy(bool busy)
@@ -1775,6 +1877,7 @@ namespace NovaNote
             if (_aiBusy) return;
             string prompt = AiInput.Text.Trim();
             if (string.IsNullOrEmpty(prompt)) return;
+            KiHistory.Add(prompt);
 
             var provider = AiStore.ActiveProvider;
             var model = provider?.ActiveModel;
@@ -1793,20 +1896,27 @@ namespace NovaNote
                 ? _attachments.Select(a => a.DataUri).ToList()
                 : null;
             int imageCount = images?.Count ?? 0;
+            int imageTokens = images != null ? _attachments.Sum(a => ChatImages.EstimateTokens(a)) : 0;
 
             AddChatMessage("user", prompt, images);
             AiInput.Clear();
             ClearAttachments();
             _aiPendingCall = null;
             _aiPendingChatId = null;
+            _contextRetried = false;
 
-            TrimAiTranscript();
             _aiMessages.RemoveAll(m => m.Role == "system");
             _aiMessages.Insert(0, new AiMessage { Role = "system", Content = BuildAiSystemPrompt(model, imageCount) });
-            var userMsg = new AiMessage { Role = "user", Content = prompt, Images = images };
+            var userMsg = new AiMessage { Role = "user", Content = prompt, Images = images, ImageTokens = imageTokens };
             foreach (var m in _aiMessages)
-                if (m != userMsg && m.Images != null) m.Images = null;
+                if (m != userMsg && m.Images != null)
+                {
+                    m.Images = null;
+                    m.ImageTokens = 0;
+                }
             _aiMessages.Add(userMsg);
+
+            TrimAiTranscript(provider, model);
 
             _aiCts = new CancellationTokenSource();
             await AiRunAsync(0);
@@ -1833,14 +1943,38 @@ namespace NovaNote
                     lock (_chatStreamLock) _chatStreamBuf.Clear();
                     _chatFlush.Start();
 
+                    int estimateBefore = ContextBudget.Count(_aiMessages, provider, model);
                     var reply = await LocalAiClient.ChatStreamAsync(
                         provider, model, _aiMessages, AiTools.Definitions(), _aiCts.Token, ChatStreamChunk);
                     FlushChatStream(true);
 
+                    if (reply.HasUsage)
+                    {
+                        ContextBudget.Calibrate(provider, model, reply.PromptTokens, estimateBefore);
+                        _tokenShown = reply.PromptTokens + reply.CompletionTokens;
+                        _tokenMode = "exakt (Server)";
+                        UpdateTokenBar();
+                    }
+
                     if (reply.Error != null)
                     {
-                        if (_chatStreamEntry.Content.Length == 0) _chatTranscript.Remove(_chatStreamEntry);
-                        AppendAi("Fehler: " + reply.Error);
+                        if (_chatStreamEntry != null && _chatStreamEntry.Content.Length == 0)
+                            _chatTranscript.Remove(_chatStreamEntry);
+
+                        if (LocalAiClient.IsContextError(reply.Error) && !_contextRetried)
+                        {
+                            _contextRetried = true;
+                            if (_chatStreamEntry != null) _chatTranscript.Remove(_chatStreamEntry);
+                            TrimAiHard(provider, model);
+                            AppendAi($"Kontext voll ({FmtTokens(_tokenShown)} / {FmtTokens(ContextBudget.ContextFor(model))}): ältere Nachrichten gekürzt, neuer Versuch.");
+                            _chatStreamEntry = null;
+                            continue;
+                        }
+
+                        string hint = LocalAiClient.IsContextError(reply.Error)
+                            ? " — Kontext zu klein: ältere Nachrichten sind gekürzt; Kontext in „KI-Einstellungen…“ erhöhen oder „Verlauf löschen“."
+                            : "";
+                        AppendAi("Fehler: " + reply.Error + hint);
                         break;
                     }
 
@@ -1895,7 +2029,7 @@ namespace NovaNote
                             });
                         }
 
-                        TrimAiTranscript();
+                        TrimAiTranscript(provider, model);
                         continue;
                     }
 
@@ -1912,7 +2046,7 @@ namespace NovaNote
                     _aiMessages.Add(new AiMessage { Role = "assistant", Content = content });
                     _chatStreamEntry = null;
 
-                    TrimAiTranscript();
+                    TrimAiTranscript(provider, model);
                     break;
                 }
             }
@@ -1939,6 +2073,7 @@ namespace NovaNote
             result.StartsWith("Unbekanntes Tool", StringComparison.Ordinal) ||
             result.StartsWith("Kein Suchbegriff", StringComparison.Ordinal) ||
             result.StartsWith("Kein Code übergeben", StringComparison.Ordinal) ||
+            result.StartsWith("Unbekannte Sprache", StringComparison.Ordinal) ||
             result.StartsWith("Formatfehler", StringComparison.Ordinal) ||
             result.StartsWith("Aktion fehlgeschlagen", StringComparison.Ordinal);
 
@@ -1959,6 +2094,11 @@ namespace NovaNote
             entry.Result = result;
             entry.IsError = isError;
             entry.State = isError ? "error" : "done";
+            if (string.Equals(call.Name, "set_language", StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateLanguageChecks();
+                UpdateStatus();
+            }
             PostChat(new { type = "updateToolResult", id = entry.Id, result = result, isError = isError });
             if (_chatUnavailable) AppendAi($"→ {call.Name} ({AiTools.ShortArgs(call.Arguments)})\n← {result}");
             return result;
@@ -1976,7 +2116,7 @@ namespace NovaNote
             if (entry == null) return;
             var result = await RunTool(call, entry);
             _aiMessages.Add(new AiMessage { Role = "tool", ToolCallId = call.Id, Content = result });
-            TrimAiTranscript();
+            TrimAiTranscript(AiStore.ActiveProvider, AiStore.ActiveModel);
             UpdateStatus();
 
             _aiCts = new CancellationTokenSource();
@@ -2005,7 +2145,7 @@ namespace NovaNote
             PostChat(new { type = "updateToolResult", id = id, result = "Aktion vom Nutzer abgelehnt.", isError = false });
             PostChat(new { type = "updateToolStatus", id = id, state = "dismissed" });
 
-            TrimAiTranscript();
+            TrimAiTranscript(AiStore.ActiveProvider, AiStore.ActiveModel);
             AppendAi("Aktion verworfen.");
             AiInput.Focus();
         }
@@ -2017,13 +2157,81 @@ namespace NovaNote
             _aiMessages.Clear();
             _aiPendingCall = null;
             _aiPendingChatId = null;
+            _contextRetried = false;
+            _tokenShown = 0;
+            _tokenMode = ContextBudget.ModeLabel(ContextBudget.KindFor(AiStore.ActiveProvider, AiStore.ActiveModel));
+            ContextBudget.ResetCalibration(AiStore.ActiveProvider, AiStore.ActiveModel);
             _chatTranscript.Clear();
             _chatPending.Clear();
             _chatSeq = 0;
             PostChat(new { type = "clearChat" });
             AiLog.Clear();
             ClearAttachments();
+            UpdateTokenBar();
             AiInput.Focus();
+        }
+
+        void AiFavoritesPopup_Click(object sender, RoutedEventArgs e)
+        {
+            var list = KiHistory.Favorites.ToList();
+            FavoritesItems.ItemsSource = list;
+            FavoritesEmptyHint.Visibility = list.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            AiFavoritesPopup.IsOpen = true;
+        }
+
+        void AiHistoryPopup_Click(object sender, RoutedEventArgs e)
+        {
+            var list = KiHistory.Entries.ToList();
+            HistoryItems.ItemsSource = list;
+            HistoryEmptyHint.Visibility = list.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            AiHistoryPopup.IsOpen = true;
+        }
+
+        void HistoryStar_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is InputEntry entry)
+            {
+                KiHistory.ToggleFavorite(entry.Text);
+                HistoryItems.ItemsSource = KiHistory.Entries.ToList();
+            }
+        }
+
+        void PopupInsert_Click(object sender, MouseButtonEventArgs e)
+        {
+            string text = (sender as FrameworkElement)?.DataContext switch
+            {
+                InputEntry entry => entry.Text,
+                Favorite favorite => favorite.Text,
+                _ => null
+            };
+            if (string.IsNullOrEmpty(text)) return;
+            AiInput.Text = text;
+            AiInput.Focus();
+            AiFavoritesPopup.IsOpen = false;
+            AiHistoryPopup.IsOpen = false;
+        }
+
+        void AiHistoryClear_Click(object sender, RoutedEventArgs e)
+        {
+            KiHistory.Clear();
+            HistoryItems.ItemsSource = KiHistory.Entries.ToList();
+            HistoryEmptyHint.Visibility = Visibility.Visible;
+        }
+
+        void AiFavoritesManage_Click(object sender, RoutedEventArgs e)
+        {
+            if (_favDlg != null)
+            {
+                _favDlg.Activate();
+                return;
+            }
+            _favDlg = new FavoritesDialog { Owner = this };
+            var origin = AiPanel.PointToScreen(new Point(0, 0));
+            _favDlg.WindowStartupLocation = WindowStartupLocation.Manual;
+            _favDlg.Left = origin.X + Math.Max(0, (AiPanel.ActualWidth - _favDlg.Width) / 2);
+            _favDlg.Top = origin.Y + Math.Max(0, (AiPanel.ActualHeight - _favDlg.Height) / 2);
+            _favDlg.ShowDialog();
+            _favDlg = null;
         }
 
         void AiInput_PreviewKeyDown(object sender, KeyEventArgs e)
