@@ -240,13 +240,13 @@ namespace NovaNote
             RefreshModels(focusKey);
         }
 
-        void ContextBox_LostFocus(object sender, RoutedEventArgs e) => CommitContext();
+        void ContextBox_LostFocus(object sender, RoutedEventArgs e) => CommitContextCore(null);
 
         void ContextBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter)
             {
-                CommitContext();
+                CommitContextCore("ctx");
                 e.Handled = true;
             }
         }
@@ -334,7 +334,7 @@ namespace NovaNote
             return null;
         }
 
-        void Sampling_LostFocus(object sender, RoutedEventArgs e) => CommitSamplingCore(SamplerFocusKey(sender));
+        void Sampling_LostFocus(object sender, RoutedEventArgs e) => CommitSamplingCore(null);
 
         void Sampling_KeyDown(object sender, KeyEventArgs e)
         {

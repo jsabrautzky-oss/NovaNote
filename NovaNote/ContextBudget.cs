@@ -186,10 +186,11 @@ namespace NovaNote
 
             var system = messages.Where(m => m.Role == "system").ToList();
             var rest = messages.Where(m => m.Role != "system").ToList();
-            if (rest.Count > MaxKeptMessages)
+            int maxKept = Math.Max(MaxKeptMessages, budget / 24);
+            if (rest.Count > maxKept)
             {
-                res.DroppedMessages = rest.Count - MaxKeptMessages;
-                rest = rest.Skip(rest.Count - MaxKeptMessages).ToList();
+                res.DroppedMessages = rest.Count - maxKept;
+                rest = rest.Skip(rest.Count - maxKept).ToList();
             }
             var groups = BuildGroups(rest);
             while (groups.Count > 0 && groups[0][0].Role == "tool")

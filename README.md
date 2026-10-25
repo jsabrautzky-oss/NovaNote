@@ -2,8 +2,12 @@
 
 **Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-Aktuelle Version: **0.8.0**  
-GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.8.0
+Aktuelle Version: **0.8.1**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.8.1
+
+## Neu in 0.8.1
+- **KI-Einstellungen: Fields can be left**: im Context- und Sampler-Fields der Modellauswahl nicht mehr stuck – lost focus commits ohne Focus()-regrab, so the field can be left; Enter-Commit stays in the field
+- **Kontext-Kürzling follows Token-Budget**: `MaxKeptMessages` hardcoded 40 → `Math.Max(40, BudgetFor/24)` – big context windows keep their messages and get only trimmed by the token-budget, so not `2,4k / 128k` triggers a trim at 2.4k Tokens
 
 ## Neu in 0.8.0
 - **Die KI schlägt das Nachschlagewerk nach**: neues Werkzeug `get_help` mit eingebettetem `hilfe.md` – Bedienfragen zu Menüs, Tastenkürzeln, Folding und Einstellungen beantwortet die KI aus dem Handbuch statt aus dem Kopf

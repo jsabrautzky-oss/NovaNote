@@ -2,6 +2,15 @@
 <!-- Konvention: eine Bullet = eine Änderung, ein Zeile, kurz. Präfix FEAT | FIX | CHORE | TEST (+ Bereich, z. B. ki/save/ui/harness).
      Die Zeile "Kurz: …" unter jeder Überschrift ist die einzeilige Summary; release.ps1 baut daraus die GitHub-Release-Notes. -->
 
+## 0.8.1
+Kurz: Im KI-Einstellungen kann der Nutzer wieder aus dem Context-/Sampler-Fields aus, und der Kontext-Kürzling folgt den Token-Budget statt einem Message-Limit.
+
+- FIX ki: KI-Einstellungen Context- und Sampler-Fields trapte den Fokus (LostFocus regrabbed it via RestoreEditorFocus) – lost focus commits ohne Focus()-regrab, so the field can be left; Enter-Commit stays in the field
+- FIX ki: Message-Limit `MaxKeptMessages` hardcoded 40 → `Math.Max(40, BudgetFor/24)`, big context windows keep their messages and get only trimmed by the token-budget, so not `2,4k / 128k` triggers a trim at 2.4k Tokens
+
+### Paket
+- Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.8.1-full.nupkg`, Delta von 0.8.0 (`NovaNote-0.8.1-delta.nupkg`)
+
 ## 0.8.0
 Kurz: Neues Nachschlagewerk `get_help` beantwortet Bedienfragen, und im KI-Chat sieht man live, was das Modell denkt und tut – Denk-Block per Klick, Tool-Karten beim Schreiben, Runden-Marken, Live-Statuszeile.
 
