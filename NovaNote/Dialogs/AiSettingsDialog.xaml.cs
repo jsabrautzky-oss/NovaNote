@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Windows;
@@ -21,7 +22,15 @@ namespace NovaNote
 
             _providers = AiStore.State.Providers.Select(p => p.Clone()).ToList();
             KindBox.ItemsSource = new[] { "LM Studio", "Ollama", "OpenAI-kompatibel", "Eigener Anbieter" };
-            AutoApplyBox.IsChecked = SessionStore.Prefs.AiAutoApply;
+            SamplerPresetBox.ItemsSource = new[]
+            {
+                new SamplerPreset("Präzises Coding & Logik", 0.1, 0.90, 0.05, 1.0),
+                new SamplerPreset("Ausgewogener Standard-Chat", 0.7, 0.95, 0.05, 1.1),
+                new SamplerPreset("Kreatives Schreiben / RP", 1.1, 1.00, 0.10, 1.15),
+                new SamplerPreset("Alle leer (Server-Standard)", null, null, null, null),
+            };
+            SamplerPresetBox.SelectedIndex = -1;
+            ReasoningBox.ItemsSource = AiEffort.ModelOptions;
 
             ProviderList.ItemsSource = _providers;
             _current = _providers.FirstOrDefault(p => p.Id == AiStore.State.ActiveProviderId) ?? _providers.FirstOrDefault();
@@ -119,8 +128,9 @@ namespace NovaNote
             SetKey(_current?.ApiKey ?? "");
         }
 
-        void RefreshModels()
+        void RefreshModels(string focusKey = null)
         {
+            var selectedId = (ModelList.SelectedItem as AiModelRow)?.Id;
             var rows = new List<AiModelRow>();
             if (_current != null)
             {
@@ -143,7 +153,32 @@ namespace NovaNote
                 }
             }
             ModelList.ItemsSource = rows;
+            if (selectedId != null)
+            {
+                var again = rows.FirstOrDefault(r => r.Id == selectedId);
+                if (again != null) ModelList.SelectedItem = again;
+            }
             UpdateButtons();
+            RestoreEditorFocus(focusKey);
+        }
+
+        void RestoreEditorFocus(string focusKey)
+        {
+            TextBox box = focusKey switch
+            {
+                "temp" => TempBox,
+                "topp" => TopPBox,
+                "minp" => MinPBox,
+                "repeat" => RepeatBox,
+                "ctx" => ContextBox,
+                _ => null,
+            };
+            if (box == null) return;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                box.Focus();
+                box.CaretIndex = box.Text.Length;
+            }));
         }
 
         void ModelList_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateButtons();
@@ -162,10 +197,24 @@ namespace NovaNote
             ContextBox.IsEnabled = has;
             ContextManualBox.IsChecked = model?.ContextOverride.HasValue == true;
             ContextManualBox.IsEnabled = has;
+            TempBox.Text = SamplerNum(model?.Temperature);
+            TempBox.IsEnabled = has;
+            TopPBox.Text = SamplerNum(model?.TopP);
+            TopPBox.IsEnabled = has;
+            MinPBox.Text = SamplerNum(model?.MinP);
+            MinPBox.IsEnabled = has;
+            RepeatBox.Text = SamplerNum(model?.RepeatPenalty);
+            RepeatBox.IsEnabled = has;
+            SamplerPresetBox.IsEnabled = has;
+            SamplerPresetBox.SelectedIndex = -1;
+            ReasoningBox.SelectedItem = AiEffort.Find(AiEffort.ModelOptions, model?.ReasoningEffort);
+            ReasoningBox.IsEnabled = has;
             _loading = false;
         }
 
-        void CommitContext()
+        void CommitContext() => CommitContextCore("ctx");
+
+        void CommitContextCore(string focusKey)
         {
             if (_loading || _current == null) return;
             var row = ModelList.SelectedItem as AiModelRow;
@@ -188,7 +237,7 @@ namespace NovaNote
                 model.ContextLength = ctx;
                 StatusText.Text = $"Kontext für \"{row.Name}\" auf {ctx} Tokens gesetzt — ein Scan kann den Wert ersetzen.";
             }
-            RefreshModels();
+            RefreshModels(focusKey);
         }
 
         void ContextBox_LostFocus(object sender, RoutedEventArgs e) => CommitContext();
@@ -228,6 +277,126 @@ namespace NovaNote
                 StatusText.Text = $"Kontext für \"{row.Name}\" folgt wieder der Erkennung ({model.ContextLength} Tokens).";
             }
             RefreshModels();
+        }
+
+        static string SamplerNum(double? v) => v.HasValue ? v.Value.ToString(CultureInfo.CurrentCulture) : "";
+
+        static bool TryParseSampler(string text, out double value)
+        {
+            text = (text ?? "").Trim();
+            if (text.Length == 0) { value = 0; return false; }
+            return double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value)
+                || double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+
+        void CommitSampling() => CommitSamplingCore(null);
+
+        void CommitSamplingCore(string focusKey)
+        {
+            if (_loading || _current == null) return;
+            var row = ModelList.SelectedItem as AiModelRow;
+            if (row == null) return;
+            var model = _current.Models.FirstOrDefault(m => m.Id == row.Id);
+            if (model == null) return;
+
+            var fields = new (TextBox Box, string Label, double Min, double Max, Action<AiModel, double?> Set)[]
+            {
+                (TempBox, "Temp", 0, 2, (m, v) => m.Temperature = v),
+                (TopPBox, "Top-P", 0, 1, (m, v) => m.TopP = v),
+                (MinPBox, "Min-P", 0, 1, (m, v) => m.MinP = v),
+                (RepeatBox, "Repeat Penalty", 1, 2, (m, v) => m.RepeatPenalty = v),
+            };
+
+            var parsed = new double?[fields.Length];
+            for (int i = 0; i < fields.Length; i++)
+            {
+                var f = fields[i];
+                if (f.Box.Text.Trim().Length == 0) { parsed[i] = null; continue; }
+                if (!TryParseSampler(f.Box.Text, out double v) || v < f.Min || v > f.Max)
+                {
+                    StatusText.Text = $"{f.Label} muss eine Zahl zwischen {f.Min} und {f.Max} sein (leer = Server-Standard).";
+                    return;
+                }
+                parsed[i] = v;
+            }
+
+            for (int i = 0; i < fields.Length; i++) fields[i].Set(model, parsed[i]);
+            RefreshModels(focusKey);
+            StatusText.Text = $"Sampler für \"{row.Name}\" gesetzt.";
+        }
+
+        string SamplerFocusKey(object sender)
+        {
+            if (ReferenceEquals(sender, TempBox)) return "temp";
+            if (ReferenceEquals(sender, TopPBox)) return "topp";
+            if (ReferenceEquals(sender, MinPBox)) return "minp";
+            if (ReferenceEquals(sender, RepeatBox)) return "repeat";
+            return null;
+        }
+
+        void Sampling_LostFocus(object sender, RoutedEventArgs e) => CommitSamplingCore(SamplerFocusKey(sender));
+
+        void Sampling_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                CommitSamplingCore(SamplerFocusKey(sender));
+                e.Handled = true;
+            }
+        }
+
+        sealed class SamplerPreset
+        {
+            public string Label { get; }
+            public double? Temp { get; }
+            public double? TopP { get; }
+            public double? MinP { get; }
+            public double? Repeat { get; }
+            public SamplerPreset(string label, double? temp, double? topP, double? minP, double? repeat)
+            {
+                Label = label; Temp = temp; TopP = topP; MinP = minP; Repeat = repeat;
+            }
+            public override string ToString() => Label;
+        }
+
+        void SamplerPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading || _presetBusy || _current == null) return;
+            ApplySamplerPreset(SamplerPresetBox.SelectedItem as SamplerPreset);
+        }
+
+        bool _presetBusy;
+
+        void ApplySamplerPreset(SamplerPreset preset)
+        {
+            if (preset == null || _loading) return;
+            var row = ModelList.SelectedItem as AiModelRow;
+            if (row == null) return;
+            TempBox.Text = SamplerNum(preset.Temp);
+            TopPBox.Text = SamplerNum(preset.TopP);
+            MinPBox.Text = SamplerNum(preset.MinP);
+            RepeatBox.Text = SamplerNum(preset.Repeat);
+            CommitSamplingCore(null);
+            StatusText.Text = preset.Temp == null
+                ? $"Sampler für \"{row.Name}\" geleert – Server-/Modell-Standard."
+                : $"Sampler für \"{row.Name}\" auf Vorlage \"{preset.Label}\" gesetzt " +
+                  $"({SamplerNum(preset.Temp)} / {SamplerNum(preset.TopP)} / {SamplerNum(preset.MinP)} / {SamplerNum(preset.Repeat)}).";
+            _presetBusy = true;
+            SamplerPresetBox.SelectedIndex = -1;
+            _presetBusy = false;
+        }
+
+        void ReasoningBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading || _current == null) return;
+            var row = ModelList.SelectedItem as AiModelRow;
+            if (row == null) return;
+            var model = _current.Models.FirstOrDefault(m => m.Id == row.Id);
+            if (model == null) return;
+            model.ReasoningEffort = (ReasoningBox.SelectedItem as AiEffort.Option)?.Value;
+            StatusText.Text = model.ReasoningEffort == null
+                ? $"Denken für \"{row.Name}\": Server-Standard – NovaNote sendet kein reasoning_effort."
+                : $"Denken für \"{row.Name}\": reasoning_effort = \"{model.ReasoningEffort}\".";
         }
 
         void VisionBox_Click(object sender, RoutedEventArgs e)
@@ -366,7 +535,6 @@ namespace NovaNote
                 Providers = _providers,
                 ActiveProviderId = active?.Id
             });
-            SessionStore.Prefs.AiAutoApply = AutoApplyBox.IsChecked == true;
             SessionStore.SavePrefs();
             DialogResult = true;
         }

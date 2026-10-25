@@ -18,8 +18,8 @@ namespace NovaNote
     {
         public static readonly string[] Names =
         {
-            "get_document", "search_document", "get_language", "set_language", "goto_line", "select_lines",
-            "replace_all_text", "replace_lines", "insert_at_line", "syntax_check", "format_code"
+            "get_document", "search_document", "get_language", "set_language", "set_document_title", "goto_line", "select_lines",
+            "replace_all_text", "replace_lines", "insert_at_line", "syntax_check", "format_code", "get_help"
         };
 
         static readonly string[] EditTools = { "replace_all_text", "replace_lines", "insert_at_line" };
@@ -44,6 +44,10 @@ namespace NovaNote
                 "vor dem Schreiben von Markdown/Code in eine neue Datei nötig. Schaltet die Sprach-Automatik aus.",
                 Props(("language", "string", $"Zielsprache: {DocLanguages.AllowedNames} (auch md, py, cs, c#, js, yml, c++)")),
                 new[] { "language" }),
+            Def("set_document_title", "Einem noch unbenannten Dokument einen kurzen, sprechenden Titel geben " +
+                "(z. B. nach dem Erzeugen von Inhalt oder auf Bitte des Nutzers). Nur für ungespeicherte Dokumente; " +
+                "der Titel wird beim Speichern zum Dateinamen-Vorschlag.",
+                Props(("title", "string", "Kurzer Dokumenttitel ohne Dateiendung")), new[] { "title" }),
             Def("replace_all_text", "Gesamten Dokumenttext durch den übergebenen Code ersetzen.",
                 Props(("code", "string", "Neuer vollständiger Text")), new[] { "code" }),
             Def("replace_lines", "Ein Zeileninterval im Dokument ersetzen.",
@@ -62,7 +66,11 @@ namespace NovaNote
                 Props(("line", "integer", "Zeile (1-basiert)")), new[] { "line" }),
             Def("syntax_check", "Aktuellen Syntax-Check-Status des Dokuments zurückgeben.",
                 Props()),
-            Def("format_code", "Dokument formatieren (nur Python und C#).", Props())
+            Def("format_code", "Dokument formatieren (nur Python und C#).", Props()),
+            Def("get_help", "NovaNote-Bedienwissen nachschlagen: Menüs, Tastenkürzel, Code-Folding, Zeilenumbruch, " +
+                "Zeilennummern, Syntax-Check, Einstellungen, Kodierung, Drucken, Dialoge, KI-Panel, Kommandozeile. " +
+                "Ohne topic = Inhaltsverzeichnis, mit topic = passender Abschnitt.",
+                Props(("topic", "string", "Thema/Suchbegriff, z. B. folding, shortcut, ansicht, einstellungen, drucken (optional)")))
         };
 
         static AiToolDef Def(string name, string description, Dictionary<string, object> props,
@@ -91,8 +99,12 @@ namespace NovaNote
 
         public static async Task<string> Execute(string name, string argsJson, DocumentView view)
         {
-            if (view == null) return "Kein aktives Dokument.";
             var args = ParseArgs(argsJson);
+
+            if (string.Equals((name ?? "").ToLowerInvariant(), "get_help", StringComparison.Ordinal))
+                return AiHelp.Get(Str(args, "topic", ""));
+
+            if (view == null) return "Kein aktives Dokument.";
 
             switch ((name ?? "").ToLowerInvariant())
             {
@@ -144,6 +156,11 @@ namespace NovaNote
                     SessionStore.SavePrefs();
                     view.SetLanguage(lang.Value);
                     return $"Sprache auf {DocLanguages.DisplayName(lang.Value)} gesetzt (Automatik aus).";
+                }
+
+                case "set_document_title":
+                {
+                    return view.SetTitle(Str(args, "title", ""));
                 }
 
                 case "goto_line":

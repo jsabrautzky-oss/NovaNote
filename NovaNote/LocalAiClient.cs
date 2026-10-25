@@ -36,6 +36,15 @@ namespace NovaNote
         public string Arguments { get; set; } = "{}";
     }
 
+    public class AiToolCallProgress
+    {
+        public int Index { get; set; }
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string ArgsDelta { get; set; } = "";
+        public bool IsNew { get; set; }
+    }
+
     public class AiMessage
     {
         public string Role { get; set; } = "user";
@@ -49,6 +58,7 @@ namespace NovaNote
     public class AiReply
     {
         public string Content { get; set; } = "";
+        public string Reasoning { get; set; } = "";
         public List<AiToolCall> ToolCalls { get; set; } = new List<AiToolCall>();
         public bool ToolsAccepted { get; set; }
         public string Error { get; set; } = null;
@@ -62,8 +72,8 @@ namespace NovaNote
         public const string DefaultBaseUrl = "http://localhost:1234/v1";
         public const string OllamaBaseUrl = "http://localhost:11434/v1";
 
-        static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
-        static readonly HttpClient ChatHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(300) };
+        static readonly HttpClient Http = new HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
+        static readonly HttpClient ChatHttp = new HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
 
         static readonly JsonSerializerOptions ReqOpt = new JsonSerializerOptions
         {
@@ -78,7 +88,8 @@ namespace NovaNote
             "```nova\n{\"action\":\"replace_all_text\",\"code\":\"...\"}\n``` aus. Erlaubte Aktionen: " +
             "replace_all_text (code), replace_lines (from_line,to_line,text), insert_at_line (line,text), " +
             "search_document (pattern), get_language (keine Argumente), set_language (language), " +
-            "goto_line (line), select_lines (from_line,to_line).";
+            "goto_line (line), select_lines (from_line,to_line), " +
+            "get_help (topic, optional) für Bedienfragen zum Programm (Menüs, Shortcuts, Folding, Einstellungen).";
 
         public static string NormalizeBase(string url)
         {
@@ -419,7 +430,8 @@ namespace NovaNote
 
         public static async Task<AiReply> ChatStreamAsync(
             AiProvider provider, AiModel model, List<AiMessage> messages, List<AiToolDef> tools,
-            CancellationToken ct, Action<string> onChunk)
+            CancellationToken ct, Action<string> onChunk, Action<string> onReasoning = null,
+            Action<AiToolCallProgress> onToolCall = null)
         {
             var reply = new AiReply();
             if (provider == null) { reply.Error = "Kein Anbieter gewählt."; return reply; }
@@ -450,6 +462,7 @@ namespace NovaNote
                             reply.ToolsAccepted = false;
                             AppendFallbackHint(messages);
                             reply.ToolCalls = ParseFallbackToolCalls(reply.Content);
+                            if (!string.IsNullOrEmpty(reply.Reasoning)) onReasoning?.Invoke(reply.Reasoning);
                             if (!string.IsNullOrEmpty(reply.Content)) onChunk?.Invoke(reply.Content);
                             return reply;
                         }
@@ -462,6 +475,7 @@ namespace NovaNote
                 }
 
                 var content = new StringBuilder();
+                var reason = new StringBuilder();
                 var partial = new Dictionary<int, AiToolCall>();
                 var order = new List<int>();
 
@@ -478,12 +492,18 @@ namespace NovaNote
                         try
                         {
                             using var doc = JsonDocument.Parse(payload);
-                            ApplyStreamChunk(doc.RootElement, content, partial, order, reply);
+                            ApplyStreamChunk(doc.RootElement, content, reason, partial, order, reply, onToolCall);
                         }
                         catch
                         {
                         }
                         if (reply.Error != null) break;
+                        if (reason.Length > 0)
+                        {
+                            string rdelta = reason.ToString();
+                            reason.Clear();
+                            onReasoning?.Invoke(rdelta);
+                        }
                         if (content.Length > 0)
                         {
                             string delta = content.ToString();
@@ -519,8 +539,8 @@ namespace NovaNote
             }
         }
 
-        static void ApplyStreamChunk(JsonElement root, StringBuilder content,
-            Dictionary<int, AiToolCall> partial, List<int> order, AiReply reply)
+        static void ApplyStreamChunk(JsonElement root, StringBuilder content, StringBuilder reason,
+            Dictionary<int, AiToolCall> partial, List<int> order, AiReply reply, Action<AiToolCallProgress> onToolCall)
         {
             if (root.TryGetProperty("error", out var err))
             {
@@ -545,14 +565,11 @@ namespace NovaNote
                 }
             }
 
-            if (delta.TryGetProperty("reasoning_content", out var r) && r.ValueKind == JsonValueKind.String)
+            string rpiece = ReadReasonDelta(delta);
+            if (!string.IsNullOrEmpty(rpiece))
             {
-                string piece = r.GetString();
-                if (!string.IsNullOrEmpty(piece))
-                {
-                    content.Append(piece);
-                    reply.Content = (reply.Content ?? "") + piece;
-                }
+                reason.Append(rpiece);
+                reply.Reasoning = (reply.Reasoning ?? "") + rpiece;
             }
 
             if (!delta.TryGetProperty("tool_calls", out var calls) || calls.ValueKind != JsonValueKind.Array)
@@ -562,22 +579,75 @@ namespace NovaNote
             {
                 int index = partial.Count;
                 if (call.TryGetProperty("index", out var ix) && ix.TryGetInt32(out int i)) index = i;
+                bool isNew = false;
                 if (!partial.TryGetValue(index, out var acc))
                 {
                     acc = new AiToolCall { Id = "", Name = "", Arguments = "" };
                     partial[index] = acc;
                     order.Add(index);
+                    isNew = true;
                 }
                 string id = ReadString(call, "id");
                 if (!string.IsNullOrEmpty(id)) acc.Id = id;
+                string argsDelta = null;
                 if (call.TryGetProperty("function", out var fn) && fn.ValueKind == JsonValueKind.Object)
                 {
                     string name = ReadString(fn, "name");
                     if (!string.IsNullOrEmpty(name)) acc.Name += name;
                     string args = ReadString(fn, "arguments");
-                    if (!string.IsNullOrEmpty(args)) acc.Arguments += args;
+                    if (!string.IsNullOrEmpty(args))
+                    {
+                        acc.Arguments += args;
+                        argsDelta = args;
+                    }
+                }
+                if (isNew || argsDelta != null || id != null)
+                    onToolCall?.Invoke(new AiToolCallProgress
+                    {
+                        Index = index,
+                        Id = acc.Id,
+                        Name = acc.Name,
+                        ArgsDelta = argsDelta ?? "",
+                        IsNew = isNew
+                    });
+            }
+        }
+
+        static string ReadReasonDelta(JsonElement e)
+        {
+            foreach (var key in new[] { "reasoning_content", "reasoning", "reasoning_text" })
+            {
+                if (!e.TryGetProperty(key, out var v)) continue;
+                if (v.ValueKind == JsonValueKind.String)
+                {
+                    string s = v.GetString();
+                    if (!string.IsNullOrEmpty(s)) return s;
+                }
+                else if (v.ValueKind == JsonValueKind.Object)
+                {
+                    string s = ReadString(v, "text");
+                    if (!string.IsNullOrEmpty(s)) return s;
                 }
             }
+            if (e.TryGetProperty("reasoning_details", out var d))
+            {
+                if (d.ValueKind == JsonValueKind.String) return d.GetString();
+                if (d.ValueKind == JsonValueKind.Array)
+                {
+                    var sb = new StringBuilder();
+                    foreach (var item in d.EnumerateArray())
+                    {
+                        if (item.ValueKind == JsonValueKind.String) sb.Append(item.GetString());
+                        else if (item.ValueKind == JsonValueKind.Object)
+                        {
+                            string t = ReadString(item, "text");
+                            if (!string.IsNullOrEmpty(t)) sb.Append(t);
+                        }
+                    }
+                    if (sb.Length > 0) return sb.ToString();
+                }
+            }
+            return null;
         }
 
         static async Task<JsonDocument> GetJsonAsync(string url, string key, CancellationToken ct)
@@ -595,10 +665,16 @@ namespace NovaNote
 
         static async Task<HttpResponseMessage> PostChatAsync(string url, string key, ChatRequestDto body, CancellationToken ct)
         {
+            string json = JsonSerializer.Serialize(body, ReqOpt);
+            if (DebugLog.Enabled)
+                DebugLog.Log("HTTP", $"POST {url} · Request {json.Length} Zeichen · {json}");
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
-            req.Content = new StringContent(JsonSerializer.Serialize(body, ReqOpt), Encoding.UTF8, "application/json");
+            req.Content = new StringContent(json, Encoding.UTF8, "application/json");
             if (!string.IsNullOrEmpty(key)) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-            return await ChatHttp.SendAsync(req, ct);
+            var response = await ChatHttp.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (DebugLog.Enabled)
+                DebugLog.Log("HTTP", $"Antwort {(int)response.StatusCode} {response.StatusCode} · {url}");
+            return response;
         }
 
         static ChatRequestDto BuildRequest(AiProvider provider, AiModel model, List<AiMessage> messages,
@@ -608,18 +684,34 @@ namespace NovaNote
             int used = ContextBudget.Count(messages, provider, model);
             int maxTokens = Math.Max(ContextBudget.MinReserve, ctx - used);
 
-            var body = new ChatRequestDto
-            {
-                Model = model.Id,
-                Stream = stream,
-                Temperature = 0.2,
-                MaxTokens = maxTokens,
-                Messages = messages.Select(ToDto).ToList()
-            };
+             var body = new ChatRequestDto
+             {
+                 Model = model.Id,
+                 Stream = stream,
+                 MaxTokens = maxTokens,
+                 Messages = messages.Select(ToDto).ToList()
+             };
             if (stream)
                 body.StreamOptions = new Dictionary<string, object> { ["include_usage"] = true };
+            string effort = AiEffort.Resolve(model);
             if (provider != null && provider.Kind == AiKind.Ollama)
-                body.Options = new Dictionary<string, object> { ["num_ctx"] = ctx };
+            {
+                var opts = new Dictionary<string, object> { ["num_ctx"] = ctx };
+                if (model.Temperature.HasValue) opts["temperature"] = model.Temperature.Value;
+                if (model.TopP.HasValue) opts["top_p"] = model.TopP.Value;
+                if (model.MinP.HasValue) opts["min_p"] = model.MinP.Value;
+                if (model.RepeatPenalty.HasValue) opts["repeat_penalty"] = model.RepeatPenalty.Value;
+                if (effort != null) opts["reasoning_effort"] = effort;
+                body.Options = opts;
+            }
+            else
+            {
+                body.Temperature = model.Temperature;
+                body.TopP = model.TopP;
+                body.MinP = model.MinP;
+                body.RepeatPenalty = model.RepeatPenalty;
+                body.ReasoningEffort = effort;
+            }
             if (tools != null && tools.Count > 0)
             {
                 body.Tools = tools.Select(t => new ToolDto
@@ -700,6 +792,7 @@ namespace NovaNote
                     return;
                 }
                 reply.Content = ReadString(msg, "content") ?? "";
+                reply.Reasoning = ReadReasonDelta(msg) ?? "";
                 if (msg.TryGetProperty("tool_calls", out var calls) && calls.ValueKind == JsonValueKind.Array)
                 {
                     int i = 0;
@@ -811,6 +904,36 @@ namespace NovaNote
             return calls;
         }
 
+        public static int FillUnansweredToolCalls(List<AiMessage> msgs)
+        {
+            if (msgs == null || msgs.Count == 0) return 0;
+            int i = msgs.Count - 1;
+            while (i >= 0 && msgs[i].Role == "tool") i--;
+            if (i < 0) return 0;
+            var last = msgs[i];
+            if (last.Role != "assistant" || last.ToolCalls == null || last.ToolCalls.Count == 0) return 0;
+            var answered = new HashSet<string>();
+            for (int j = i + 1; j < msgs.Count; j++)
+            {
+                var m = msgs[j];
+                if (m.Role == "tool" && !string.IsNullOrEmpty(m.ToolCallId)) answered.Add(m.ToolCallId);
+            }
+            int added = 0;
+            foreach (var c in last.ToolCalls)
+                if (!string.IsNullOrEmpty(c.Id) && !answered.Contains(c.Id))
+                {
+                    msgs.Add(new AiMessage
+                    {
+                        Role = "tool",
+                        ToolCallId = c.Id,
+                        Content = "Schritt nicht ausgeführt – verworfen."
+                    });
+                    answered.Add(c.Id);
+                    added++;
+                }
+            return added;
+        }
+
         static void AddFallbackJson(string json, List<AiToolCall> calls)
         {
             try
@@ -841,7 +964,11 @@ namespace NovaNote
             [JsonPropertyName("model")] public string Model { get; set; }
             [JsonPropertyName("messages")] public List<ChatMessageDto> Messages { get; set; } = new List<ChatMessageDto>();
             [JsonPropertyName("stream")] public bool Stream { get; set; }
-            [JsonPropertyName("temperature")] public double Temperature { get; set; }
+            [JsonPropertyName("temperature")] public double? Temperature { get; set; }
+            [JsonPropertyName("top_p")] public double? TopP { get; set; }
+            [JsonPropertyName("min_p")] public double? MinP { get; set; }
+            [JsonPropertyName("repeat_penalty")] public double? RepeatPenalty { get; set; }
+            [JsonPropertyName("reasoning_effort")] public string ReasoningEffort { get; set; }
             [JsonPropertyName("max_tokens")] public int MaxTokens { get; set; }
             [JsonPropertyName("stream_options")] public Dictionary<string, object> StreamOptions { get; set; }
             [JsonPropertyName("options")] public Dictionary<string, object> Options { get; set; }

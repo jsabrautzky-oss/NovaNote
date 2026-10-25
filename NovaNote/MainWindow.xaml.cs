@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -60,9 +61,6 @@ namespace NovaNote
         bool _aiBusy;
         CancellationTokenSource _aiCts;
         readonly List<AiMessage> _aiMessages = new List<AiMessage>();
-        AiToolCall _aiPendingCall;
-        string _aiPendingChatId;
-        int _aiPendingRound;
         AiSettingsDialog _aiDlg;
         FavoritesDialog _favDlg;
         readonly ObservableCollection<ChatImage> _attachments = new ObservableCollection<ChatImage>();
@@ -70,6 +68,9 @@ namespace NovaNote
         int _tokenShown;
         string _tokenMode = "geschätzt";
         bool _contextRetried;
+        string _lastAiActiveKey, _lastAiActiveName, _lastAiTabSetKey;
+        TabModel _aiRunTab;
+        DocumentView _aiRunView;
 
         static CoreWebView2Environment _chatEnv;
         static readonly JsonSerializerOptions ChatJson = new JsonSerializerOptions
@@ -85,8 +86,22 @@ namespace NovaNote
         ChatEntry _chatStreamEntry;
         bool _chatStreamShown;
         readonly StringBuilder _chatStreamBuf = new StringBuilder();
+        readonly StringBuilder _chatReasonBuf = new StringBuilder();
         readonly object _chatStreamLock = new object();
         DispatcherTimer _chatFlush;
+        readonly List<ToolArgBuf> _chatToolBuf = new List<ToolArgBuf>();
+        readonly List<ChatEntry> _roundToolEntries = new List<ChatEntry>();
+        int _aiRound;
+        int _aiToolCount;
+        DateTime _aiRunStart;
+        readonly List<string> _aiSignatures = new List<string>();
+
+        class ToolArgBuf
+        {
+            public int Index;
+            public string Name = "";
+            public readonly StringBuilder Args = new StringBuilder();
+        }
 
         public TabModel Active => _active;
         public DocumentView ActiveView => _active?.View;
@@ -109,6 +124,9 @@ namespace NovaNote
             TabStrip.SizeChanged += (s, e) => UpdateTabWidths();
             SizeChanged += (s, e) => SyncDefaultAiWidth();
 
+            AiReasoningBox.ItemsSource = AiEffort.ChatOptions;
+            AiReasoningBox.SelectedItem = AiEffort.Find(AiEffort.ChatOptions, SessionStore.Prefs.AiReasoningEffort);
+
             if (restoreSession && SessionStore.Prefs.RestoreSession && SessionStore.HasSession)
             {
                 var st = session ?? SessionStore.LoadSession();
@@ -121,7 +139,7 @@ namespace NovaNote
                     {
                         var v = NewView();
                         v.RestoreSession(t.Path, t.Text, t.Enc, t.Eol, t.Zoom, t.Wrap,
-                            t.ScrollX, t.ScrollY, t.Caret, t.Dirty, (DocLanguage)t.Language);
+                            t.ScrollX, t.ScrollY, t.Caret, t.Dirty, (DocLanguage)t.Language, t.Title);
                         AddView(v);
                     }
                     TabStrip.SelectedItem = Tabs[Math.Clamp(ws.Active, 0, Tabs.Count - 1)];
@@ -155,6 +173,12 @@ namespace NovaNote
             AiStore.Changed += OnAiStoreChanged;
             Closed += (s, e) => AiStore.Changed -= OnAiStoreChanged;
             ApplyAiPanel(SessionStore.Prefs.AiPanelOpen);
+
+            DebugLog.Enabled = SessionStore.Prefs.DebugLog;
+            DebugLog.TryStart();
+            MainMenu.AddHandler(MenuItem.ClickEvent, new RoutedEventHandler(LogMenuItemClick), true);
+            AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(LogButtonClick), true);
+            Closed += (s, e) => DebugLog.Log("APP", "Fenster geschlossen");
 
             _chatFlush = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(70) };
             _chatFlush.Tick += (s, e) => FlushChatStream();
@@ -247,7 +271,7 @@ namespace NovaNote
             if (tab == null) return;
             var v = tab.View;
             ClosedHistory.Add(new ClosedDoc(v.Path_, v.CurrentText, v.Enc, v.Eol, v.Zoom, v.WordWrap,
-                v.IsDirty, v.Lang));
+                v.IsDirty, v.Lang, v.CustomName));
             while (ClosedHistory.Count > 15) ClosedHistory.RemoveAt(0);
             TabRestoreItem.IsEnabled = ClosedHistory.Count > 0;
         }
@@ -438,7 +462,7 @@ namespace NovaNote
             var d = ClosedHistory[ClosedHistory.Count - 1];
             ClosedHistory.RemoveAt(ClosedHistory.Count - 1);
             var v = NewView();
-            v.RestoreSession(d.Path, d.Text, d.Enc, d.Eol, d.Zoom, d.Wrap, 0, 0, 0, d.Dirty, d.Language);
+            v.RestoreSession(d.Path, d.Text, d.Enc, d.Eol, d.Zoom, d.Wrap, 0, 0, 0, d.Dirty, d.Language, d.Title);
             AddView(v);
             UpdateMenuChecks();
         }
@@ -657,10 +681,10 @@ namespace NovaNote
             FoldingItem.IsChecked = SessionStore.Prefs.Folding;
             SyntaxNextItem.IsEnabled = ActiveView?.HasSyntaxErrors == true;
             UpdateAutoItem.IsChecked = SessionStore.Prefs.UpdateCheck;
+            DebugLogItem.IsChecked = SessionStore.Prefs.DebugLog;
             _aiApplying = true;
             AiPanelItem.IsChecked = AiPanel.Visibility == Visibility.Visible;
             AiToggle.IsChecked = AiPanel.Visibility == Visibility.Visible;
-            AiAutoApplyItem.IsChecked = SessionStore.Prefs.AiAutoApply;
             _aiApplying = false;
             UpdateEncodingChecks();
             UpdateEolChecks();
@@ -746,8 +770,9 @@ namespace NovaNote
                         Wrap = t.View.WordWrap,
                          ScrollX = sx, ScrollY = sy, Caret = car,
                          Dirty = t.View.IsDirty,
-                         Language = (int)t.View.Lang
-                    });
+                         Language = (int)t.View.Lang,
+                         Title = t.View.CustomName
+                     });
                 }
                 st.Windows.Add(ws);
             }
@@ -1236,13 +1261,6 @@ namespace NovaNote
             ApplyAiPanel(AiPanelItem.IsChecked);
         }
 
-        void AiAutoApply_Click(object sender, RoutedEventArgs e)
-        {
-            SessionStore.Prefs.AiAutoApply = AiAutoApplyItem.IsChecked;
-            SessionStore.SavePrefs();
-            ActiveView?.FocusEditor();
-        }
-
         void OnAiStoreChanged()
         {
             Dispatcher.BeginInvoke(new Action(() => RefreshAiPanel()));
@@ -1260,6 +1278,8 @@ namespace NovaNote
             AiModelBox.ItemsSource = provider?.Models ?? new List<AiModel>();
             AiModelBox.SelectedItem = provider?.Models.FirstOrDefault(m =>
                 selectedModel != null && string.Equals(m.Id, selectedModel.Id, StringComparison.OrdinalIgnoreCase));
+            if (AiReasoningBox.ItemsSource == null) AiReasoningBox.ItemsSource = AiEffort.ChatOptions;
+            AiReasoningBox.SelectedItem = AiEffort.Find(AiEffort.ChatOptions, SessionStore.Prefs.AiReasoningEffort);
             _aiSyncing = false;
 
             UpdateAiStatus();
@@ -1278,6 +1298,14 @@ namespace NovaNote
             var provider = AiStore.ActiveProvider;
             if (provider != null && AiModelBox.SelectedItem is AiModel model)
                 AiStore.SetActiveModel(provider, model.Id);
+            UpdateAiStatus();
+        }
+
+        void AiReasoningBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_aiSyncing) return;
+            SessionStore.Prefs.AiReasoningEffort = (AiReasoningBox.SelectedItem as AiEffort.Option)?.Value;
+            SessionStore.SavePrefs();
             UpdateAiStatus();
         }
 
@@ -1307,8 +1335,10 @@ namespace NovaNote
             string ctx = model.ContextOverride.HasValue
                 ? $"{model.EffectiveContext} (manuell)"
                 : (model.ContextDetected ? model.EffectiveContext.ToString() : $"{model.EffectiveContext} (Annahme)");
+            string effort = AiEffort.Resolve(model);
             AiStatus.Text = $"KI: {provider.Name} · {model.DisplayName} · Kontext {ctx} · " +
-                            $"Vision {vision} · Tools {(model.SupportsTools ? "Ja" : "Nein")}";
+                            $"Vision {vision} · Tools {(model.SupportsTools ? "Ja" : "Nein")} · " +
+                            $"Denken {AiEffort.LabelOf(effort)}";
             AiStatus.ToolTip = $"{provider.BaseUrl} · Modell-ID {model.Id}";
             if (_aiMessages.Count > 0 && _tokenMode != "exakt (Server)")
             {
@@ -1575,12 +1605,15 @@ namespace NovaNote
             public string Id;
             public string Role;
             public string Content;
+            public string Reasoning;
             public List<string> Images;
             public string ToolName;
             public string Args;
             public string Result;
             public string State;
             public bool IsError;
+            public int Round;
+            public int Repeat;
         }
 
         static string ChatAssetsFolder => Path.Combine(AppContext.BaseDirectory, "Assets", "Chat");
@@ -1609,11 +1642,11 @@ namespace NovaNote
             PostChat(new { type = "setTheme", dark = ThemeService.IsDark });
         }
 
-        ChatEntry AddChatMessage(string role, string text, List<string> images = null)
+        ChatEntry AddChatMessage(string role, string text, List<string> images = null, string reasoning = null)
         {
-            var entry = new ChatEntry { Id = NextChatId(role), Role = role, Content = text, Images = images };
+            var entry = new ChatEntry { Id = NextChatId(role), Role = role, Content = text, Reasoning = reasoning, Images = images };
             _chatTranscript.Add(entry);
-            PostChat(new { type = "addMessage", id = entry.Id, role = role, content = text, images = images });
+            PostChat(new { type = "addMessage", id = entry.Id, role = role, content = text, images = images, reasoning = reasoning });
             if (_chatUnavailable && AiLog != null)
             {
                 string line = text;
@@ -1704,18 +1737,24 @@ namespace NovaNote
 
         void ReplayChat()
         {
+            int lastRound = 0;
             foreach (var e in _chatTranscript)
             {
+                if (e.Round >= 2 && e.Round != lastRound)
+                {
+                    lastRound = e.Round;
+                    PostChat(new { type = "addRound", round = e.Round });
+                }
                 if (e.Role == "tool")
                 {
-                    PostChat(new { type = "addToolCall", id = e.Id, toolName = e.ToolName, args = e.Args });
+                    PostChat(new { type = "addToolCall", id = e.Id, toolName = e.ToolName, args = e.Args, round = e.Round, repeat = e.Repeat });
                     if (e.Result != null)
                         PostChat(new { type = "updateToolResult", id = e.Id, result = e.Result, isError = e.IsError });
                     PostChat(new { type = "updateToolStatus", id = e.Id, state = e.State ?? "running" });
                 }
                 else
                 {
-                    PostChat(new { type = "addMessage", id = e.Id, role = e.Role, content = e.Content, images = e.Images });
+                    PostChat(new { type = "addMessage", id = e.Id, role = e.Role, content = e.Content, images = e.Images, reasoning = e.Reasoning });
                 }
             }
         }
@@ -1749,12 +1788,6 @@ namespace NovaNote
                     case "insertIntoEditor":
                         InsertChatCode(ChatString(root, "content"));
                         break;
-                    case "confirmToolCall":
-                        _ = ChatConfirmTool(ChatString(root, "id"));
-                        break;
-                    case "discardToolCall":
-                        ChatDiscardTool(ChatString(root, "id"));
-                        break;
                     case "chatEscape":
                         if (_aiBusy) _aiCts?.Cancel();
                         break;
@@ -1785,7 +1818,10 @@ namespace NovaNote
         string BuildAiSystemPrompt(AiModel model, int imageCount = 0)
         {
             var view = ActiveView;
-            string name = string.IsNullOrEmpty(view?.Path_) ? "neu (ohne Datei)" : System.IO.Path.GetFileName(view.Path_);
+            string name;
+            if (!string.IsNullOrEmpty(view?.Path_)) name = System.IO.Path.GetFileName(view.Path_);
+            else if (!string.IsNullOrWhiteSpace(view?.CustomName)) name = view.CustomName;
+            else name = "neu (ohne Datei)";
             string lang = view?.StatusLanguage ?? "Text";
             int lines = view?.LineCount ?? 0;
             int sel = view?.SelectedText?.Length ?? 0;
@@ -1794,14 +1830,71 @@ namespace NovaNote
             sb.Append($"Du bist der KI-Assistent für NovaNote. Aktive Datei: {name} — {lang}, {lines} Zeilen");
             if (sel > 0) sb.Append($", {sel} Zeichen ausgewählt");
             sb.Append(".\n");
-            sb.Append($"Dokument-Art: {lang}. get_language zeigt die Art, set_language stellt sie um (z. B. markdown, python, csharp); " +
-                      "set_language vor dem Schreiben eines Markdown-/Code-Dokuments. format_code braucht python oder csharp.\n");
+
+            // Multi-Tab-Bewusstsein: gibt es immer, auch bei nur einem Tab.
+            sb.Append("Multi-Tab: mehrere Dokumente können offen sein; der Nutzer öffnet/schließt/wechselt Tabs und benennt sie jederzeit um, auch zwischen deinen Nachrichten. ");
+            sb.Append("Deine Werkzeuge wirken nur auf das AKTIVE Dokument; für ein anderes muss der Nutzer erst den Tab wechseln. ");
+
+            string activeKey = view == null ? "" : (string.IsNullOrEmpty(view.Path_) ? "tab:" + (view.TabTitle ?? "") : "path:" + view.Path_);
+            var setKeys = new List<string>();
+            foreach (var t in Tabs)
+                setKeys.Add(t?.View == null ? "?" : (string.IsNullOrEmpty(t.View.Path_) ? "tab:" + (t.View.TabTitle ?? "") : "path:" + t.View.Path_));
+            string setKey = string.Join("||", setKeys);
+
+            bool changed = false;
+            if (_lastAiActiveKey != null && activeKey != _lastAiActiveKey)
+            {
+                sb.Append($"Hinweis: das aktive Dokument hat sich seit deiner letzten Nachricht geändert: „{_lastAiActiveName}“ → „{name}“. ");
+                changed = true;
+            }
+            if (_lastAiTabSetKey != null && setKey != _lastAiTabSetKey)
+            {
+                sb.Append("Hinweis: die offenen Dokumente haben sich geändert (geöffnet, geschlossen oder umbenannt). ");
+                changed = true;
+            }
+            if (changed)
+                sb.Append("Orientiere dich an der oben gemeldeten aktiven Datei und frage nach, wenn unklar ist, welches Dokument gemeint ist.");
+            sb.Append("\n");
+
+            if (Tabs.Count >= 2)
+            {
+                var parts = new List<string>();
+                int idx = 0;
+                foreach (var t in Tabs)
+                {
+                    idx++;
+                    if (idx > 12) break;
+                    string title = t?.View?.TabTitle ?? "Unbenannt";
+                    if (title.Length > 40) title = title.Substring(0, 40) + "…";
+                    string flags = ReferenceEquals(t, _active) ? " (AKTIV)" : "";
+                    if (t?.View != null && t.View.IsDirty) flags += " (geändert)";
+                    parts.Add($"[{idx}] {title}{flags}");
+                }
+                string list = string.Join(" · ", parts);
+                if (Tabs.Count > 12) list += $" … (+{Tabs.Count - 12} weitere)";
+                if (list.Length > 600) list = list.Substring(0, 600) + "…";
+                sb.Append($"Offene Tabs: {list}\n");
+            }
+
+            _lastAiActiveKey = activeKey;
+            _lastAiActiveName = name;
+            _lastAiTabSetKey = setKey;
+
+            sb.Append($"NovaNote {AiHelp.Version()} (WPF/.NET), Repo {UpdateService.RepoUrl}. " +
+                      "Bei Bedienfragen (Menüs, Kürzel, Folding, Umbruch, Einstellungen, Drucken …) schlägst du im " +
+                      "Nachschlagewerk nach: rufe get_help auf (leer = Inhaltsverzeichnis, topic = Abschnitt); " +
+                      "zitiere Menüpfade wie „Ansicht → Code-Folding“.\n");
+            sb.Append($"Dokument-Art: {lang}. set_language stellt sie um (z. B. markdown, python, csharp) — vor dem " +
+                      "Schreiben setzen; format_code braucht python oder csharp.\n");
             if (imageCount > 0)
                 sb.Append($"Der Nutzer hat {imageCount} Bild(er) angehängt (image_url-Parts im content-Array); beschreibe sie bei Bedarf.\n");
-            sb.Append("Der Dokumenttext wird nicht automatisch geschickt. Lies ihn bei Bedarf selbst über die Werkzeuge: ");
-            sb.Append("get_document (kompletter Text oder Ausschnitt mit from_line/count), search_document (Suchtreffer), ");
-            sb.Append("goto_line/select_lines (Navigation/Auswahl).\n");
+            sb.Append("Der Dokumenttext wird nicht automatisch geschickt; lies ihn bei Bedarf mit get_document " +
+                      "(Ausschnitt via from_line/count) oder search_document.\n");
             sb.Append("Änderungen machst du mit replace_all_text, replace_lines oder insert_at_line und prüfst danach syntax_check.\n");
+            sb.Append("Titel: Hat das aktive Dokument noch keinen Titel („neu (ohne Datei)“) und du hast Inhalt erzeugt " +
+                      "(z. B. eine Liste, ein Aufsatz, Code), gib ihm mit set_document_title einen kurzen, sprechenden Titel – " +
+                      "selbstständig und auch wenn der Nutzer danach fragt. Nie bei bereits gespeicherter Datei.\n");
+            sb.Append("Arbeite so lange mit Werkzeugen, bis die Aufgabe erledigt ist – lesen/schreiben so oft nötig – dann kurze Endantwort.\n");
             sb.Append("Reine Fragen beantwortest du als Text ohne Codeblock; wenn du Code erzeugst, ");
             sb.Append("umschließe ihn mit dreifachen Backticks (```).\n");
             sb.Append($"Werkzeuge: {string.Join(", ", AiTools.Names)}.\n");
@@ -1861,34 +1954,190 @@ namespace NovaNote
             PostChat(new { type = "setBusy", busy });
         }
 
+        void PostActivity(string state, string tool = null)
+        {
+            PostChat(new
+            {
+                type = "activity",
+                round = _aiRound,
+                state,
+                tool,
+                tools = _aiToolCount,
+                tokens = _tokenShown,
+                elapsedMs = (int)(DateTime.UtcNow - _aiRunStart).TotalMilliseconds
+            });
+        }
+
         void ChatStreamChunk(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
             lock (_chatStreamLock) _chatStreamBuf.Append(text);
         }
 
-        void FlushChatStream(bool stop = false)
+        void ChatReasonChunk(string text)
         {
-            string text;
+            if (string.IsNullOrEmpty(text)) return;
+            lock (_chatStreamLock) _chatReasonBuf.Append(text);
+        }
+
+        void ChatToolProgress(AiToolCallProgress p)
+        {
+            if (p == null) return;
             lock (_chatStreamLock)
             {
+                ToolArgBuf buf = null;
+                foreach (var b in _chatToolBuf)
+                    if (b.Index == p.Index) { buf = b; break; }
+                if (buf == null)
+                {
+                    buf = new ToolArgBuf { Index = p.Index };
+                    _chatToolBuf.Add(buf);
+                }
+                if (!string.IsNullOrEmpty(p.Name) && p.Name.Length > buf.Name.Length) buf.Name = p.Name;
+                if (!string.IsNullOrEmpty(p.ArgsDelta)) buf.Args.Append(p.ArgsDelta);
+            }
+        }
+
+        void FlushChatStream(bool stop = false)
+        {
+            string reason, text;
+            var toolBuf = new List<ToolArgBuf>();
+            lock (_chatStreamLock)
+            {
+                reason = _chatReasonBuf.ToString();
+                _chatReasonBuf.Clear();
                 text = _chatStreamBuf.ToString();
                 _chatStreamBuf.Clear();
+                if (_chatToolBuf.Count > 0)
+                {
+                    toolBuf.AddRange(_chatToolBuf);
+                    _chatToolBuf.Clear();
+                }
             }
-            if (text.Length > 0 && _chatStreamEntry != null)
+            string activityTool = null;
+            if (_chatStreamEntry != null)
             {
-                _chatStreamEntry.Content += text;
-                if (!_chatStreamShown)
+                if (reason.Length > 0)
                 {
-                    _chatStreamShown = true;
-                    PostChat(new { type = "addMessage", id = _chatStreamEntry.Id, role = "assistant", content = text });
+                    _chatStreamEntry.Reasoning = (_chatStreamEntry.Reasoning ?? "") + reason;
+                    if (!_chatStreamShown)
+                    {
+                        _chatStreamShown = true;
+                        PostChat(new { type = "addMessage", id = _chatStreamEntry.Id, role = "assistant", content = "", reasoning = reason, round = _chatStreamEntry.Round });
+                    }
+                    else
+                    {
+                        PostChat(new { type = "appendReasoning", id = _chatStreamEntry.Id, chunk = reason });
+                    }
                 }
-                else
+                if (text.Length > 0)
                 {
-                    PostChat(new { type = "appendChunk", id = _chatStreamEntry.Id, chunk = text });
+                    _chatStreamEntry.Content += text;
+                    if (!_chatStreamShown)
+                    {
+                        _chatStreamShown = true;
+                        PostChat(new { type = "addMessage", id = _chatStreamEntry.Id, role = "assistant", content = text, reasoning = _chatStreamEntry.Reasoning, round = _chatStreamEntry.Round });
+                    }
+                    else
+                    {
+                        PostChat(new { type = "appendChunk", id = _chatStreamEntry.Id, chunk = text });
+                    }
                 }
             }
+            foreach (var buf in toolBuf)
+            {
+                ChatEntry entry = LiveToolEntry(buf.Index, buf.Name);
+                if (!string.IsNullOrEmpty(buf.Name)) entry.ToolName = buf.Name;
+                string delta = buf.Args.ToString();
+                if (delta.Length > 0) entry.Args += delta;
+                if (delta.Length > 0 || !string.IsNullOrEmpty(buf.Name))
+                    PostChat(new { type = "updateToolArgs", id = entry.Id, name = entry.ToolName, delta });
+                activityTool = entry.ToolName;
+            }
+            if (reason.Length > 0 || text.Length > 0 || toolBuf.Count > 0)
+                PostActivity(toolBuf.Count > 0 ? "toolcall" : (text.Length > 0 ? "writing" : "thinking"), activityTool);
             if (stop) _chatFlush?.Stop();
+        }
+
+        ChatEntry LiveToolEntry(int index, string name = null)
+        {
+            while (_roundToolEntries.Count <= index)
+            {
+                var entry = new ChatEntry
+                {
+                    Id = NextChatId("tool"),
+                    Role = "tool",
+                    ToolName = string.IsNullOrEmpty(name) ? "…" : name,
+                    Args = "",
+                    State = "streaming",
+                    Round = _aiRound
+                };
+                _chatTranscript.Add(entry);
+                _roundToolEntries.Add(entry);
+                PostChat(new { type = "addToolCall", id = entry.Id, toolName = entry.ToolName, args = "", live = true, round = entry.Round, repeat = 1 });
+            }
+            return _roundToolEntries[index];
+        }
+
+        void CloseLiveTools(string state)
+        {
+            foreach (var e in _roundToolEntries)
+            {
+                if (e.State != "streaming") continue;
+                e.State = state;
+                PostChat(new { type = "updateToolStatus", id = e.Id, state });
+            }
+            _roundToolEntries.Clear();
+        }
+
+        int CountRepeat(string name, string args)
+        {
+            string sig = ToolSignature(name, args);
+            int n = 0;
+            foreach (var s in _aiSignatures)
+                if (s == sig) n++;
+            _aiSignatures.Add(sig);
+            return n + 1;
+        }
+
+        static string ToolSignature(string name, string args)
+        {
+            string canon;
+            try
+            {
+                using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(args) ? "{}" : args);
+                canon = CanonicalJson(doc.RootElement);
+            }
+            catch
+            {
+                canon = (args ?? "").Trim();
+            }
+            return (name ?? "").Trim().ToLowerInvariant() + "|" + canon;
+        }
+
+        static string CanonicalJson(JsonElement e)
+        {
+            switch (e.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    var parts = new List<string>();
+                    foreach (var p in e.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal))
+                        parts.Add(p.Name + ":" + CanonicalJson(p.Value));
+                    return "{" + string.Join(",", parts) + "}";
+                case JsonValueKind.Array:
+                    var items = new List<string>();
+                    foreach (var item in e.EnumerateArray()) items.Add(CanonicalJson(item));
+                    return "[" + string.Join(",", items) + "]";
+                default:
+                    return e.ToString();
+            }
+        }
+
+        static string MergeThink(string think, string answer)
+        {
+            if (string.IsNullOrEmpty(think)) return answer ?? "";
+            if (string.IsNullOrEmpty(answer)) return think;
+            return think + "\n\n" + answer;
         }
 
         async void AiSend_Click(object sender, RoutedEventArgs e) => await AiSendAsync();
@@ -1922,9 +2171,9 @@ namespace NovaNote
             AddChatMessage("user", prompt, images);
             AiInput.Clear();
             ClearAttachments();
-            _aiPendingCall = null;
-            _aiPendingChatId = null;
             _contextRetried = false;
+            _aiRunTab = _active;
+            _aiRunView = ActiveView;
 
             _aiMessages.RemoveAll(m => m.Role == "system");
             _aiMessages.Insert(0, new AiMessage { Role = "system", Content = BuildAiSystemPrompt(model, imageCount) });
@@ -1935,9 +2184,12 @@ namespace NovaNote
                     m.Images = null;
                     m.ImageTokens = 0;
                 }
+            LocalAiClient.FillUnansweredToolCalls(_aiMessages);
             _aiMessages.Add(userMsg);
 
             TrimAiTranscript(provider, model);
+
+            DebugLog.Log("KI", $"senden an {provider.Name}/{model.Id} · Kontext {ContextBudget.ContextFor(model)} · {imageCount} Bild(er) · Prompt: {prompt}");
 
             _aiCts = new CancellationTokenSource();
             await AiRunAsync(0);
@@ -1954,19 +2206,36 @@ namespace NovaNote
             }
 
             SetAiBusy(true);
+            _aiRunStart = DateTime.UtcNow;
+            _aiToolCount = 0;
+            _aiSignatures.Clear();
             try
             {
-                for (int round = startRound; round < 6; round++)
+                for (int round = startRound; ; round++)
                 {
-                    _chatStreamEntry = new ChatEntry { Id = NextChatId("msg"), Role = "assistant", Content = "" };
+                    if (_aiRunTab != null && !Tabs.Contains(_aiRunTab))
+                    {
+                        DebugLog.Log("KI", "Tab des KI-Laufs geschlossen – Lauf beendet");
+                        AppendAi("Tab des KI-Laufs wurde geschlossen – Lauf beendet.");
+                        break;
+                    }
+
+                    _aiRound = round + 1;
+                    if (_aiRound >= 2) PostChat(new { type = "addRound", round = _aiRound });
+                    PostActivity("thinking");
+
+                    _chatStreamEntry = new ChatEntry { Id = NextChatId("msg"), Role = "assistant", Content = "", Round = _aiRound };
                     _chatTranscript.Add(_chatStreamEntry);
                     _chatStreamShown = false;
-                    lock (_chatStreamLock) _chatStreamBuf.Clear();
+                    _roundToolEntries.Clear();
+                    lock (_chatStreamLock) { _chatStreamBuf.Clear(); _chatToolBuf.Clear(); }
                     _chatFlush.Start();
 
                     int estimateBefore = ContextBudget.Count(_aiMessages, provider, model);
+                    DebugLog.Log("KI", $"Runde {round + 1}: Anfrage ({_aiMessages.Count} Nachrichten, ~{estimateBefore} Tokens)");
                     var reply = await LocalAiClient.ChatStreamAsync(
-                        provider, model, _aiMessages, AiTools.Definitions(), _aiCts.Token, ChatStreamChunk);
+                        provider, model, _aiMessages, AiTools.Definitions(), _aiCts.Token,
+                        ChatStreamChunk, ChatReasonChunk, ChatToolProgress);
                     FlushChatStream(true);
 
                     if (reply.HasUsage)
@@ -1979,6 +2248,7 @@ namespace NovaNote
 
                     if (reply.Error != null)
                     {
+                        CloseLiveTools("error");
                         if (_chatStreamEntry != null && _chatStreamEntry.Content.Length == 0)
                             _chatTranscript.Remove(_chatStreamEntry);
 
@@ -1988,6 +2258,7 @@ namespace NovaNote
                             if (_chatStreamEntry != null) _chatTranscript.Remove(_chatStreamEntry);
                             TrimAiHard(provider, model);
                             AppendAi($"Kontext voll ({FmtTokens(_tokenShown)} / {FmtTokens(ContextBudget.ContextFor(model))}): ältere Nachrichten gekürzt, neuer Versuch.");
+                            DebugLog.Log("KI", $"Kontext-Fehler (Runde {round + 1}) → hart gekürzt, Wiederholungsversuch: {reply.Error}");
                             _chatStreamEntry = null;
                             continue;
                         }
@@ -1995,6 +2266,7 @@ namespace NovaNote
                         string hint = LocalAiClient.IsContextError(reply.Error)
                             ? " — Kontext zu klein: ältere Nachrichten sind gekürzt; Kontext in „KI-Einstellungen…“ erhöhen oder „Verlauf löschen“."
                             : "";
+                        DebugLog.Log("KI", $"Fehler (Runde {round + 1}): {reply.Error}");
                         AppendAi("Fehler: " + reply.Error + hint);
                         break;
                     }
@@ -2010,38 +2282,59 @@ namespace NovaNote
                         _aiMessages.Add(new AiMessage
                         {
                             Role = "assistant",
-                            Content = reply.Content,
+                            Content = MergeThink(reply.Reasoning, reply.Content),
                             ToolCalls = reply.ToolCalls
                         });
+                        if (_chatStreamEntry != null && !_chatStreamShown) _chatTranscript.Remove(_chatStreamEntry);
                         _chatStreamEntry = null;
+                        DebugLog.Log("KI", $"Runde {round + 1}: {reply.ToolCalls.Count} Tool-Calls · content=„{reply.Content}“ · reasoning=„{reply.Reasoning}“");
 
-                        foreach (var call in reply.ToolCalls)
+                        for (int i = 0; i < reply.ToolCalls.Count; i++)
                         {
-                            var toolEntry = new ChatEntry
-                            {
-                                Id = NextChatId("tool"),
-                                Role = "tool",
-                                ToolName = call.Name,
-                                Args = call.Arguments,
-                                State = "running"
-                            };
-                            _chatTranscript.Add(toolEntry);
-                            PostChat(new { type = "addToolCall", id = toolEntry.Id, toolName = call.Name, args = call.Arguments });
+                            var call = reply.ToolCalls[i];
+                            int repeat = CountRepeat(call.Name, call.Arguments);
+                            _aiToolCount++;
 
-                            if (AiTools.IsEditTool(call.Name) && !SessionStore.Prefs.AiAutoApply && !_chatUnavailable)
+                            ChatEntry toolEntry = i < _roundToolEntries.Count ? _roundToolEntries[i] : null;
+                            if (toolEntry == null)
                             {
-                                toolEntry.State = "pending";
-                                _aiPendingCall = call;
-                                _aiPendingChatId = toolEntry.Id;
-                                _aiPendingRound = round + 1;
-                                PostChat(new { type = "updateToolStatus", id = toolEntry.Id, state = "pending" });
-                                AppendAi("Editor-Aktion wartet auf Bestätigung: im Tool-Card „Bestätigen“ klicken.");
-                                SetAiBusy(false);
-                                AiInput.Focus();
-                                return;
+                                toolEntry = new ChatEntry
+                                {
+                                    Id = NextChatId("tool"),
+                                    Role = "tool",
+                                    ToolName = call.Name,
+                                    Args = call.Arguments,
+                                    State = "running",
+                                    Round = _aiRound,
+                                    Repeat = repeat
+                                };
+                                _chatTranscript.Add(toolEntry);
+                                PostChat(new { type = "addToolCall", id = toolEntry.Id, toolName = call.Name, args = call.Arguments, round = _aiRound, repeat });
                             }
+                            else
+                            {
+                                if (!string.IsNullOrEmpty(call.Name)) toolEntry.ToolName = call.Name;
+                                toolEntry.Args = call.Arguments;
+                                toolEntry.Repeat = repeat;
+                                toolEntry.State = "running";
+                                PostChat(new
+                                {
+                                    type = "updateToolArgs",
+                                    id = toolEntry.Id,
+                                    name = toolEntry.ToolName,
+                                    args = call.Arguments,
+                                    final = true,
+                                    round = _aiRound,
+                                    repeat
+                                });
+                            }
+                            PostActivity("tool", toolEntry.ToolName);
+                            DebugLog.Log("KI", $"tool_call: {call.Name} args={call.Arguments}");
+                            if (repeat > 1)
+                                DebugLog.Log("KI", $"wiederholter Schritt: {call.Name} #{repeat} (Runde {round + 1})");
 
                             var result = await RunTool(call, toolEntry);
+                            DebugLog.Log("KI", $"tool_result: {call.Name} → {result}");
                             _aiMessages.Add(new AiMessage
                             {
                                 Role = "tool",
@@ -2050,22 +2343,23 @@ namespace NovaNote
                             });
                         }
 
+                        CloseLiveTools("error");
                         TrimAiTranscript(provider, model);
                         continue;
                     }
 
                     string content = reply.Content ?? "";
-                    if (string.IsNullOrWhiteSpace(content))
-                    {
-                        _chatTranscript.Remove(_chatStreamEntry);
-                        AppendAi("KI: (leere Antwort)");
-                        break;
-                    }
+                    string think = reply.Reasoning ?? "";
 
-                    if (!_chatStreamShown)
-                        PostChat(new { type = "addMessage", id = _chatStreamEntry.Id, role = "assistant", content = content });
-                    _aiMessages.Add(new AiMessage { Role = "assistant", Content = content });
+                    if (!_chatStreamShown && (content.Length > 0 || think.Length > 0))
+                        PostChat(new { type = "addMessage", id = _chatStreamEntry.Id, role = "assistant", content = content, reasoning = _chatStreamEntry.Reasoning ?? think, round = _chatStreamEntry.Round });
+                    if (content.Length == 0 && think.Length == 0 && _chatStreamEntry != null && !_chatStreamShown)
+                        _chatTranscript.Remove(_chatStreamEntry);
+
+                    _aiMessages.Add(new AiMessage { Role = "assistant", Content = MergeThink(think, content) });
                     _chatStreamEntry = null;
+                    PostActivity("answer");
+                    DebugLog.Log("KI", $"Runde {round + 1} Endantwort: content=„{content}“ · reasoning=„{think}“");
 
                     TrimAiTranscript(provider, model);
                     break;
@@ -2074,12 +2368,15 @@ namespace NovaNote
             catch (OperationCanceledException)
             {
                 FlushChatStream(true);
+                CloseLiveTools("cancelled");
                 if (_chatStreamEntry != null && _chatStreamEntry.Content.Length == 0)
                     _chatTranscript.Remove(_chatStreamEntry);
+                DebugLog.Log("KI", "Lauf abgebrochen (Nutzer/Escape).");
                 AppendAi("Abgebrochen.");
             }
             finally
             {
+                CloseLiveTools("error");
                 _chatStreamEntry = null;
                 _chatFlush?.Stop();
                 SetAiBusy(false);
@@ -2104,13 +2401,14 @@ namespace NovaNote
             bool isError;
             try
             {
-                result = await AiTools.Execute(call.Name, call.Arguments, ActiveView);
+                result = await AiTools.Execute(call.Name, call.Arguments, _aiRunView ?? ActiveView);
                 isError = IsToolError(result);
             }
             catch (Exception ex)
             {
                 result = "Aktion fehlgeschlagen: " + ex.Message;
                 isError = true;
+                DebugLog.Log("KI", $"tool_exception: {call.Name} → {ex.GetType().Name}: {ex.Message}");
             }
             entry.Result = result;
             entry.IsError = isError;
@@ -2125,59 +2423,11 @@ namespace NovaNote
             return result;
         }
 
-        async Task ChatConfirmTool(string id)
-        {
-            if (_aiPendingCall == null || _aiPendingChatId != id) return;
-            var call = _aiPendingCall;
-            var chatId = _aiPendingChatId;
-            _aiPendingCall = null;
-            _aiPendingChatId = null;
-
-            var entry = FindChatEntry(chatId);
-            if (entry == null) return;
-            var result = await RunTool(call, entry);
-            _aiMessages.Add(new AiMessage { Role = "tool", ToolCallId = call.Id, Content = result });
-            TrimAiTranscript(AiStore.ActiveProvider, AiStore.ActiveModel);
-            UpdateStatus();
-
-            _aiCts = new CancellationTokenSource();
-            await AiRunAsync(_aiPendingRound);
-        }
-
-        void ChatDiscardTool(string id)
-        {
-            if (_aiPendingCall == null || _aiPendingChatId != id) return;
-            _aiMessages.Add(new AiMessage
-            {
-                Role = "tool",
-                ToolCallId = _aiPendingCall.Id,
-                Content = "Aktion vom Nutzer abgelehnt."
-            });
-            _aiPendingCall = null;
-            _aiPendingChatId = null;
-
-            var entry = FindChatEntry(id);
-            if (entry != null)
-            {
-                entry.Result = "Aktion vom Nutzer abgelehnt.";
-                entry.IsError = false;
-                entry.State = "dismissed";
-            }
-            PostChat(new { type = "updateToolResult", id = id, result = "Aktion vom Nutzer abgelehnt.", isError = false });
-            PostChat(new { type = "updateToolStatus", id = id, state = "dismissed" });
-
-            TrimAiTranscript(AiStore.ActiveProvider, AiStore.ActiveModel);
-            AppendAi("Aktion verworfen.");
-            AiInput.Focus();
-        }
-
         void AiCancel_Click(object sender, RoutedEventArgs e) => _aiCts?.Cancel();
 
         void AiClear_Click(object sender, RoutedEventArgs e)
         {
             _aiMessages.Clear();
-            _aiPendingCall = null;
-            _aiPendingChatId = null;
             _contextRetried = false;
             _tokenShown = 0;
             _tokenMode = ContextBudget.ModeLabel(ContextBudget.KindFor(AiStore.ActiveProvider, AiStore.ActiveModel));
@@ -2185,6 +2435,11 @@ namespace NovaNote
             _chatTranscript.Clear();
             _chatPending.Clear();
             _chatSeq = 0;
+            _aiRound = 0;
+            _aiToolCount = 0;
+            _aiSignatures.Clear();
+            _roundToolEntries.Clear();
+            lock (_chatStreamLock) { _chatStreamBuf.Clear(); _chatReasonBuf.Clear(); _chatToolBuf.Clear(); }
             PostChat(new { type = "clearChat" });
             AiLog.Clear();
             ClearAttachments();
@@ -2316,6 +2571,13 @@ namespace NovaNote
 
         void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (_aiBusy && e.Key == Key.Escape)
+            {
+                _aiCts?.Cancel();
+                e.Handled = true;
+                return;
+            }
+
             bool inAiInput = AiInput != null && Keyboard.FocusedElement == AiInput;
             if (inAiInput && Keyboard.Modifiers == ModifierKeys.Control && (e.Key == Key.Z || e.Key == Key.Y)) return;
             if (inAiInput && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.Z) return;
@@ -2489,6 +2751,43 @@ namespace NovaNote
             dlg.ShowDialog();
             ActiveView?.FocusEditor();
         }
+
+        void DebugLog_Click(object sender, RoutedEventArgs e)
+        {
+            SessionStore.Prefs.DebugLog = DebugLogItem.IsChecked;
+            SessionStore.SavePrefs();
+            DebugLog.Enabled = DebugLogItem.IsChecked;
+            DebugLog.Session(DebugLogItem.IsChecked ? "Logging an" : "Logging aus");
+            ActiveView?.FocusEditor();
+        }
+
+        void DebugLogOpen_Click(object sender, RoutedEventArgs e)
+        {
+            DebugLog.Log("AKTION", "Debug-Log geöffnet (Explorer)");
+            DebugLog.OpenFolder();
+        }
+
+        void LogMenuItemClick(object sender, RoutedEventArgs e)
+        {
+            if (!(e.OriginalSource is MenuItem mi)) return;
+            string label = mi.Header as string ?? mi.Name ?? mi.GetType().Name;
+            if (mi.IsCheckable) label += " = " + (mi.IsChecked ? "an" : "aus");
+            string path = (mi.Parent is MenuItem pm && pm.Header is string ph) ? ph + " → " + label : label;
+            DebugLog.Log("AKTION", "Menü: " + path);
+        }
+
+        void LogButtonClick(object sender, RoutedEventArgs e)
+        {
+            if (!(e.OriginalSource is ButtonBase b)) return;
+            string tip = b.ToolTip as string;
+            string content = b.Content as string;
+            string label;
+            if (!string.IsNullOrWhiteSpace(tip)) label = tip;
+            else if (!string.IsNullOrWhiteSpace(b.Name)) label = b.Name;
+            else if (!string.IsNullOrWhiteSpace(content) && content.Length > 2) label = content;
+            else label = b.GetType().Name;
+            DebugLog.Log("AKTION", "Button: " + label);
+        }
     }
 
     public class TabModel : INotifyPropertyChanged
@@ -2496,6 +2795,8 @@ namespace NovaNote
         public DocumentView View { get; }
 
         string _title = "Unbenannt";
+        string _name = "Unbenannt";
+        bool _dirty;
         string _tip = "Unbenannt";
         double _width = 220;
 
@@ -2503,6 +2804,18 @@ namespace NovaNote
         {
             get => _title;
             set { if (_title == value) return; _title = value; Raise(nameof(Title)); }
+        }
+
+        public string Name
+        {
+            get => _name;
+            set { if (_name == value) return; _name = value; Raise(nameof(Name)); }
+        }
+
+        public bool Dirty
+        {
+            get => _dirty;
+            set { if (_dirty == value) return; _dirty = value; Raise(nameof(Dirty)); }
         }
 
         public string Tip
@@ -2526,6 +2839,8 @@ namespace NovaNote
         public void RefreshTitle()
         {
             Title = View.TabTitle;
+            Name = View.DisplayName;
+            Dirty = View.IsDirty;
             Tip = View.Path_ ?? "Unbenannt";
         }
 
@@ -2545,12 +2860,13 @@ namespace NovaNote
         public bool Wrap;
         public bool Dirty;
         public DocLanguage Language;
+        public string Title;
 
         public ClosedDoc(string path, string text, NovaNoteEncoding enc, LineEnding eol,
-                         int zoom, bool wrap, bool dirty, DocLanguage language)
+                         int zoom, bool wrap, bool dirty, DocLanguage language, string title = null)
         {
             Path = path; Text = text; Enc = enc; Eol = eol; Zoom = zoom; Wrap = wrap;
-            Dirty = dirty; Language = language;
+            Dirty = dirty; Language = language; Title = title;
         }
     }
 

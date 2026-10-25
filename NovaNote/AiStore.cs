@@ -29,6 +29,12 @@ namespace NovaNote
         public bool Manual { get; set; }
         public bool Available { get; set; } = true;
 
+        public double? Temperature { get; set; }
+        public double? TopP { get; set; }
+        public double? MinP { get; set; }
+        public double? RepeatPenalty { get; set; }
+        public string ReasoningEffort { get; set; } = null;
+
         [JsonIgnore]
         public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Id : Name;
 
@@ -50,7 +56,12 @@ namespace NovaNote
             VisionOverride = VisionOverride,
             SupportsTools = SupportsTools,
             Manual = Manual,
-            Available = Available
+            Available = Available,
+            Temperature = Temperature,
+            TopP = TopP,
+            MinP = MinP,
+            RepeatPenalty = RepeatPenalty,
+            ReasoningEffort = ReasoningEffort
         };
     }
 
@@ -327,6 +338,55 @@ namespace NovaNote
             {
                 return null;
             }
+        }
+    }
+
+    public static class AiEffort
+    {
+        public sealed class Option
+        {
+            public string Label { get; }
+            public string Value { get; }
+            public Option(string label, string value) { Label = label; Value = value; }
+            public override string ToString() => Label;
+        }
+
+        static readonly (string Value, string Label)[] Values =
+        {
+            ("off", "Aus (off)"),
+            ("minimal", "Minimal"),
+            ("low", "Niedrig (low)"),
+            ("medium", "Mittel (medium)"),
+            ("xhigh", "Extrem (xhigh)"),
+            ("adaptive", "Adaptiv"),
+        };
+
+        public static readonly Option[] ModelOptions = Build("keine – Server-Standard");
+        public static readonly Option[] ChatOptions = Build("Denken: Modell-Standard");
+
+        static Option[] Build(string firstLabel)
+        {
+            var list = new List<Option> { new Option(firstLabel, null) };
+            foreach (var v in Values) list.Add(new Option(v.Label, v.Value));
+            return list.ToArray();
+        }
+
+        public static Option Find(Option[] options, string value) =>
+            options.FirstOrDefault(o => string.Equals(o.Value, value, StringComparison.OrdinalIgnoreCase)) ?? options[0];
+
+        public static string Resolve(AiModel model)
+        {
+            var chat = SessionStore.Prefs.AiReasoningEffort;
+            if (!string.IsNullOrWhiteSpace(chat)) return chat.Trim();
+            var perModel = model?.ReasoningEffort;
+            return string.IsNullOrWhiteSpace(perModel) ? null : perModel.Trim();
+        }
+
+        public static string LabelOf(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "Standard";
+            var hit = Values.FirstOrDefault(v => string.Equals(v.Value, value, StringComparison.OrdinalIgnoreCase));
+            return hit.Label ?? value;
         }
     }
 }

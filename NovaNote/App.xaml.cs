@@ -16,6 +16,17 @@ namespace NovaNote
 
             Codec.Name(NovaNoteEncoding.Utf8);
             SessionStore.LoadPrefs();
+            DebugLog.Enabled = SessionStore.Prefs.DebugLog;
+            if (DebugLog.Enabled)
+            {
+                DispatcherUnhandledException += (s, ex) =>
+                    DebugLog.Log("FEHLER", "Dispatcher: " + ex.Exception);
+                AppDomain.CurrentDomain.UnhandledException += (s, ex) =>
+                    DebugLog.Log("FEHLER", "AppDomain: " + (ex.ExceptionObject as Exception ?? new Exception(ex.ExceptionObject?.ToString())));
+                System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, ex) =>
+                    DebugLog.Log("FEHLER", "Task: " + ex.Exception);
+            }
+            DebugLog.TryStart();
             AiStore.Load();
             ThemeService.SetMode(SessionStore.Prefs.Theme);
 

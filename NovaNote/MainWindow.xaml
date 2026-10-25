@@ -43,12 +43,26 @@
         <DataTemplate x:Key="TabContentTemplate">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding Title}" ToolTip="{Binding Tip}"
-                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="10,0,2,0"/>
-                <Button Grid.Column="1" Style="{StaticResource TabCloseButton}" Content="&#xE8BB;"
+                <TextBlock Grid.Column="0" Text="&#x25CF;" Foreground="{DynamicResource AccentBrush}"
+                           VerticalAlignment="Center" Margin="10,0,4,0" ToolTip="Ungespeicherte Änderungen">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Hidden"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Dirty}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Grid.Column="1" Text="{Binding Name}" ToolTip="{Binding Tip}"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                <Button Grid.Column="2" Style="{StaticResource TabCloseButton}" Content="&#xE8BB;"
                         Command="{x:Static local:Commands.CloseTab}" CommandParameter="{Binding}"
                         ToolTip="Tab schließen" Margin="0,0,6,0"/>
             </Grid>
@@ -180,8 +194,6 @@
             <MenuItem Header="KI">
                 <MenuItem x:Name="AiPanelItem" Header="KI-Panel" InputGestureText="Strg+Alt+K"
                           IsCheckable="True" IsChecked="False" Click="AiPanel_Click"/>
-                <MenuItem x:Name="AiAutoApplyItem" Header="Aktionen automatisch anwenden"
-                          IsCheckable="True" IsChecked="False" Click="AiAutoApply_Click"/>
                 <Separator/>
                 <MenuItem x:Name="AiScanItem" Header="Modelle scannen" Click="AiScan_Click"/>
                 <MenuItem x:Name="AiSettingsItem" Header="KI-Einstellungen…" Click="AiSettings_Click"/>
@@ -194,6 +206,11 @@
                     <Separator/>
                     <MenuItem x:Name="UpdateNowItem" Header="Nach Update prüfen" Click="UpdateNow_Click"/>
                 </MenuItem>
+                <Separator/>
+                <MenuItem x:Name="DebugLogItem" Header="Debug-Log" IsCheckable="True"
+                          ToolTip="Alle Aktionen, der komplette KI-Chat (Eingaben, Antworten, Tool-Aufrufe) und Fehler werden mit Zeitstempel in debug.log mitschrieben"
+                          Click="DebugLog_Click"/>
+                <MenuItem x:Name="DebugLogOpenItem" Header="Debug-Log öffnen" Click="DebugLogOpen_Click"/>
                 <Separator/>
                 <MenuItem x:Name="HelpAboutItem" Header="Über NovaNote" Click="HelpAbout_Click"/>
             </MenuItem>
@@ -302,6 +319,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <ComboBox Grid.Column="0" x:Name="AiProviderBox" Margin="0,0,6,0" ToolTip="Anbieter"
                               SelectionChanged="AiProviderBox_SelectionChanged">
@@ -319,6 +337,9 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
+                    <ComboBox Grid.Column="2" x:Name="AiReasoningBox" Width="112" Margin="6,0,0,0"
+                              ToolTip="Denktiefe (reasoning_effort) – gilt für alle Nachrichten; „Modell-Standard“ nutzt die Vorgabe aus KI → KI-Einstellungen… Kein Wert wird gesendet, wenn dort auch nichts gesetzt ist."
+                              SelectionChanged="AiReasoningBox_SelectionChanged"/>
                 </Grid>
 
                 <TextBlock Grid.Row="1" x:Name="AiStatus" Margin="0,8,0,6" Text="KI bereit"

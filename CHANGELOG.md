@@ -2,6 +2,67 @@
 <!-- Konvention: eine Bullet = eine Änderung, ein Zeile, kurz. Präfix FEAT | FIX | CHORE | TEST (+ Bereich, z. B. ki/save/ui/harness).
      Die Zeile "Kurz: …" unter jeder Überschrift ist die einzeilige Summary; release.ps1 baut daraus die GitHub-Release-Notes. -->
 
+## 0.8.0
+Kurz: Neues Nachschlagewerk `get_help` beantwortet Bedienfragen, und im KI-Chat sieht man live, was das Modell denkt und tut – Denk-Block per Klick, Tool-Karten beim Schreiben, Runden-Marken, Live-Statuszeile.
+
+- FEAT ki: neues Werkzeug `get_help` plus eingebettetes `Assets/Help/hilfe.md` – die KI schlägt dort Menüs, Tastenkürzel, Folding, Einstellungen und Dialoge nach und beantwortet Bedienfragen (Loader `AiHelp.cs`, ohne Dokument lauffähig)
+- FEAT ki: System-Prompt nennt jetzt Version (aus der Assembly), Repo-URL und eine Kurzübersicht der Menüs und verweist auf `get_help` für Details
+- CHORE ki: `get_help` ist auch im nova-Fallback für server ohne native Tool-Aufrufe erlaubt
+- TEST harness: `ui`-Modus prüft `get_help` (Inhaltsverzeichnis ohne Dokument, Folding-Abschnitt, Tastenkürzel, nova-Fallback) und zählt 12 Tool-Schemas
+- FEAT ki: Denkprozess (`reasoning_content`) wird im Chat getrennt von der Antwort in einem abgesetzten, einklappbaren Block (🧠 „Denken“) über der Antwort gezeigt und klappt beim Antwortbeginn automatisch zu
+- FEAT ki: `LocalAiClient` trennt `reasoning_content` von `content` (neue `onReasoning`-Senke, `AiReply.Reasoning`), das Denken bleibt aber im Modell-Kontext erhalten
+- TEST harness: `stream`-Modus prüft getrennte Ströme – `reply.Reasoning` separat, `reply.Content` ohne Denken, `onReasoning`/`onChunk` getrennt
+- FEAT ki: System-Prompt erklärt dynamisches Multi-Tab (Nutzer öffnet/schließt/wechselt Tabs jederzeit), listet alle offenen Tabs mit `(AKTIV)`-Marker und meldet Dokumenten- bzw. Tab-Mengen-Wechsel; Werkzeuge bleiben auf das aktive Dokument beschränkt
+- TEST harness: `ui`-Modus prüft den Multi-Tab-Prompt – beide Titel + `(AKTIV)`, Wechsel-Marker (B→A) und Mengen-Marker nach Tab-Schließen
+- FIX ki: ein KI-Lauf ist an sein Start-Dokument gebunden (`RunTool` nutzt die Start-View statt des aktuell aktiven Tabs) – ein Tab-Wechsel während der Antwort biegt Lese-/Schreibziel nicht mehr um und provoziert keinen Wiederholungs-Loop; ein geschlossener Tab beendet den Lauf sauber
+- FIX ki: Anti-Loop (identischer Tool-Schritt mit denselben Argumenten stoppt), Rundenlimit von 6 auf 5 gesenkt und Stopp-Meldung „Nach 5 KI-Schritten gestoppt (keine Endantwort)“; Esc bricht einen laufenden KI-Lauf jetzt immer ab (auch bei Editor-Fokus)
+- CHORE ki: System-Prompt gestrafft (weniger Tokens, passt wieder ins kleine Kontextbudget) und Anti-Loop-Hinweis ergänzt
+- TEST harness: `ui`-Modus prüft, dass `RunTool` die gebundene Start-View nutzt und nicht den gerade aktiven Tab
+- FEAT ki: Runden-/Tool-Limit pro Antwort auf Standard 40 erhöht und in „KI-Einstellungen…“ als Feld „Max. KI-Schritte“ einstellbar (Schlüssel `MaxAiRounds`, gelemmt 1–200) statt starrer 5
+- FIX ki: Anti-Loop bricht einen Lauf nicht mehr hart ab – ein identischer Tool-Schritt wird übersprungen und mit einer korrektiven Tool-Rückmeldung beantwortet, die KI kann sich selbst korrigieren und der Lauf läuft weiter
+- FIX ki: Nachrichtenkette bleibt nach Überspringen/Abbruch/verworfener Bestätigung gültig – jede `tool_call` erhält ein Ergebnis (`LocalAiClient.FillUnansweredToolCalls`), damit nicht mehr „HTTP 400: Cannot continue an assistant message that contains tool calls“ auftritt
+- TEST harness: `context`-Modus prüft `MaxAiRounds`-Standard (40) und Klemmung (1–200) sowie dass `FillUnansweredToolCalls` fehlende Tool-Ergebnisse ergänzt und eine gültige Historie unverändert lässt
+- FEAT ki: neues Werkzeug `set_document_title` gibt einem noch unbenannten Dokument einen kurzen, sprechenden Titel (ohne Bestätigungskarte); der Titel wird beim Speichern zum Dateinamen-Vorschlag und übersteht Neustarts (Session)
+- FEAT ki: System-Prompt weist die KI an, ein Dokument nach dem Erzeugen von Inhalt selbstständig zu benennen (auch auf Bitte des Nutzers); der gesetzte Titel erscheint im Prompt als aktive Datei
+- TEST harness: `ui` prüft `set_document_title` (13 Werkzeug-Schemas, kein Edit-Tool, setzt den Tab-Titel auf einem leeren Dokument, Hinweis bei bereits gespeicherter Datei)
+- FIX ui: ein ungespeicherter Tab wird jetzt mit einem führenden Punkt (●) vor dem Titel markiert statt mit `*` am Ende – der Marker bleibt sichtbar, auch wenn der Titel im Tab mit „…“ gekürzt wird (Punkt reserviert Platz, Einrückung bleibt konstant)
+- FEAT ui: optionales Debug-Log (Hilfe → „Debug-Log") schreibt alle Aktionen, den kompletten KI-Chat (Eingaben, Antworten, Tool-Aufrufe und -Ergebnisse) sowie Fehler mit Zeitstempel nach `debug.log` (Rotieren ab ~10 MB); „Debug-Log öffnen" zeigt die Datei im Explorer; Standard aus (per `#if DEBUG` nur in Development-Builds an) – neue Klasse `DebugLog.cs`, Schlüssel `AppPrefs.DebugLog`
+- TEST harness: `ui` schaltet das Debug-Log ein und prüft, dass `debug.log` im Datenordner entsteht und Zeilen mit Zeitstempel/Kategorien (APP/KI/HTTP/AKTION) enthält
+- FIX ki: Anti-Loop überspringt nur noch direkt hintereinander wiederholte identische Editier-Schritte, niemals Lese-/Re-Reads – die KI wird nicht mehr blockiert, wenn sie nach eigenen Dokumentänderungen erneut lesen will (Log-Fall `get_document` nach `insert_at_line`)
+- TEST harness: `ui`-Mock sendet `get_document` → Edit → erneut `get_document` und prüft, dass beide Lese-Aufrufe ein Ergebnis bekommen und keiner als „übersprungen“ endet
+- FIX ki: eine Runde ohne Textantwort und ohne Tool-Aufruf (nur Denkinhalt) gilt nicht mehr als fertige Endantwort – die KI fasst bis zu zweimal nach, sonst klare Meldung; behebt „KI arbeitet nicht zu Ende“ bei Denk-Modellen, die endlos denken ohne zu handeln
+- TEST harness: `ui`-Mock liefert erst eine Denkrunde ohne Ergebnis und danach eine echte Antwort; prüft „Nachfass“ und dass am Ende eine verwertbare Endantwort steht
+- FEAT ki: Bestätigen/Verwerfen für KI-Editoraktionen komplett entfernt – jede Schreib-Aktion greift sofort ohne Bestätigungs-Karte (Rückgängig Strg+Z macht sie rückgängig); Menüpunkt und Dialogfeld „Aktionen automatisch anwenden“ sowie Schlüssel `AiAutoApply` entfallen
+- CHORE ki: mit der Bestätigung fällt auch die Wiederaufnahme des KI-Laufs über `ChatConfirmTool`/`AiRunAsync(pendingRound)` weg – der Lauf läuft in einem Durchgang ohne Halt/Mehrfach-Stopp durch
+- TEST harness: `ui`-Mock prüft, dass ein Edit-Tool ohne Pending direkt im Editor landet (keine `_aiPendingCall`, keine Bestätigungs-Buttons)
+- CHORE ki: gesamten KI-Selbstschutz entfernt – kein Anti-Loop-Überspringen identischer Schritte (`_aiRunSigs`), kein „Nachfassen bei leerer Antwort“, kein Schritt-/Runden-Limit mehr; die KI läuft unbegrenzt und ungehindert, nur Esc bricht ab
+- CHORE ki: `MaxAiRounds`/`ClampRounds` samt Feld „Max. KI-Schritte“ im KI-Dialog und Schlüssel entfallen (kein Runden-Limit mehr)
+- FIX ai: HTTP-Timeouts in `LocalAiClient` (`Http` 120 s, `ChatHttp` 300 s) auf unendlich gesetzt – lang denkende Modelle brechen nicht mehr ab und Tool-Aufrufe gehen nicht mehr verloren
+- FEAT ki: Prompt („Agent-Seele“) statt „nie dasselbe Werkzeug mehrfach“ jetzt positiv formuliert („arbeite so lange mit Werkzeugen, bis die Aufgabe erledigt ist“); alle 13 Werkzeuge bleiben im System-Prompt gelistet
+- FIX ai: `temperature` wird nicht mehr hart auf 0.2 gesetzt (Request-DTO nullable, Feld entfällt bei null) – der Anbieter-/Modell-Standard greift; zu niedrige erzwungene Temperatur war eine Ursache für Denk-/Wiederholungs-Loops
+- FEAT ki: Sampler pro Modell einstellbar – in „KI-Einstellungen…“ (Modelliste) je Modell Temp, Top-P, Min-P, Repeat Penalty; leere Felder werden nicht gesendet (Server-/Modell-Standard), Button „Standard (Ausgewogener Chat)“ setzt 0,7/0,95/0,05/1,1; Ollama bekommt die Werte im `options`-Objekt, andere Anbieter top-level (`min_p`/`repeat_penalty`/`top_p`)
+- TEST harness: `ui` prüft, dass gesetzte Sampler-Werte im Request-Body landen (`temperature`/`top_p`/`min_p`/`repeat_penalty`) und fehlende nicht gesendet werden
+- TEST harness: `ui` entfernt Nachfass-/`MaxAiRounds`-Annahmen; `context` prüft keine Runden-Klemmung mehr (Schlüssel entfernt)
+- FIX ki: Sampler-/Kontext-Eingabe in „KI-Einstellungen…“ behält die Modellauswahl – `RefreshModels` wählt die Zeile wieder aus und setzt den Fokus zurück ins Feld (Enter/Tab wirft nicht mehr aus dem Modell)
+- FEAT ki: Dropdown „Vorlagen:“ statt Button „Standard (Ausgewogener Chat)“ – bewährte Kombinationen füllen die Sampler-Felder auf einen Schlag: Coding & Logik 0,1/0,90/0,05/1,0 · Standard-Chat 0,7/0,95/0,05/1,1 · Schreiben/RP 1,1/1,00/0,10/1,15 · „Alle leer (Server-Standard)“ löscht alle vier
+- TEST harness: `ui` prüft Vorlagen-Dropdown (Werte im Modell, Zurücksetzen auf −1, „Alle leer“) und dass Modellauswahl nach CommitContext/Sampler-Commit/manueller Eingabe erhalten bleibt
+- FEAT ki: Denktiefe einstellbar – Dropdown „Denken:“ pro Modell in „KI-Einstellungen…“ und eigenes Dropdown oben rechts im KI-Panel (Chat-Auswahl übersteuert die Modell-Vorgabe); Stufen off/minimal/low/medium/xhigh/adaptive, „Standard“ sendet nichts (`reasoning_effort` top-level, bei Ollama in `options`)
+- TEST harness: `ui` prüft Denken-Dropdown an beiden Orten, `reasoning_effort` im Request (Modell und Chat-Übersteuerung) und Nichtsenden ohne Einstellung
+- FEAT ki: Denken im Chat standardmäßig zugeklappt – der 🧠-Block nennt die Zeichenanzahl, ein Klick öffnet ihn und das Denken läuft dort live mit (kein automatisches Zu- oder Aufklappen mehr)
+- FEAT ki: Tool-Karten erscheinen schon während des Antwortstroms – Name sofort, die Argumente wachsen live mit („✍️ schreibt…“), danach Ausführung und Ergebnis wie bisher
+- FEAT ki: `LocalAiClient` erkennt neben `reasoning_content` auch `reasoning`, `reasoning_text` und `reasoning_details` (Ollama/OpenRouter) und meldet Tool-Call-Fragmente über eine neue `onToolCall`-Senke
+- FEAT ki: Runden-Marken („Runde N“) im Chat und Wiederholungs-Vermerk „🔁 2. Mal“ mit gelbem Rand, wenn dasselbe Werkzeug mit denselben Argumenten erneut aufgerufen wird – nur Sichtbarkeit, kein Eingriff in den Lauf
+- FEAT chat: „KI denkt“-Leiste wird zur Live-Statuszeile – Zustand (denkt / schreibt Werkzeug / Werkzeug läuft / antwortet), Runde, Schrittanzahl, Laufzeit, Token und einzeilig der letzte Denksatz; nach 15 s Datenstille warnt sie „keine Daten seit … s – mit Esc abbrechen“
+- FIX chat: eine Assistenzrunde ohne Text und ohne Denken (nur Tool-Aufrufe) hinterlässt keine leere Blase mehr im Chat-Verlauf
+- TEST harness: `chat` prüft zu-/aufgeklapptes Denken mit Live-Wachstum, Live-Argumente, Runden-Marke, 🔁-Badge, Statuszeile (Runde/Schritte/Token) und Stall-Warnung; `stream` prüft `delta.reasoning` und `onToolCall`-Fragmente; `ui` prüft Runden-Marken, genau eine Karte pro Aufruf, 🔁-Badge und dass der Lauf trotz identischem Schritt weiterläuft
+- FIX markdown-preview: Tabellenzeilen und Kopfzeile bekommen im dunklen Theme eigene dunkle Flächen (`MdTableRowEven/OddColor` Zebra #202020/#2B2B2B + `MdTableHeaderColor` #3A3A3A in Theme/Dark.xaml – hell unverändert #FFFFFF/#F5F5F5/#D3D3D3); der graue Kopf des `TableRowGroup` (Style-Trigger) wird per lokalem Wert überschrieben und der Tabellen-Text mitgefärbt – kein heller Hintergrund mit heller Schrift mehr
+- TEST harness: `ui` prüft die Markdown-Vorschau einer Tabelle im dunklen Theme – Zebra-Zellen und Kopfgruppen/Kopfzellen dunkel, nach Zurückwechseln auf hell wieder hell
+- FIX ki: `PostChatAsync` sendet mit `ResponseHeadersRead` – der SSE-Strom wird nicht mehr bis zum Antwortende gepuffert, Denken und Antwort erscheinen endlich tokenweise in Echtzeit (z. B. gegen llama-server)
+- TEST harness: `stream` prüft per Timing – der erste `reasoning_content`-Chunk kommt beim häppchenweise sendenden Fake-Server vor dem Antwortende an
+
+### Paket
+- Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.8.0-full.nupkg`, Delta von 0.7.1 (`NovaNote-0.8.0-delta.nupkg`)
+
 ## 0.7.1
 Kurz: Das Update läuft jetzt in-app mit Fortschrittsbalken und startet den Editor danach automatisch neu.
 

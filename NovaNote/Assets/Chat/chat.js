@@ -2,6 +2,9 @@
 
 const log = document.getElementById('log');
 const busyBox = document.getElementById('busy');
+const busyLabel = document.getElementById('busyLabel');
+const busyStat = document.getElementById('busyStat');
+const thinkLine = document.getElementById('thinkLine');
 const jumpBtn = document.getElementById('jump');
 
 const wv = (window.chrome && window.chrome.webview) ? window.chrome.webview : null;
@@ -15,11 +18,19 @@ let stick = true;
 marked.use({ gfm: true, breaks: false });
 
 const STATUS = {
+  streaming: '✍️ schreibt…',
   running: '⏳ Läuft…',
-  pending: '🟡 Warten auf Bestätigung',
   done: '✅ Abgeschlossen',
   error: '❌ Fehler',
-  dismissed: '🚫 Verworfen'
+  cancelled: '⏹ Abgebrochen'
+};
+
+const STATE_LABEL = {
+  thinking: 'KI denkt',
+  toolcall: 'KI schreibt Werkzeug',
+  tool: 'Werkzeug läuft',
+  writing: 'KI antwortet',
+  answer: 'Antwort fertig'
 };
 
 function send(payload) {
@@ -254,8 +265,79 @@ function addMessage(ev) {
   body.className = role === 'info' ? 'body' : 'body md';
   el.appendChild(body);
   log.appendChild(el);
-  msgs.set(id, { role, body, raw: ev.content || '' });
+  const entry = { role, el, body, raw: ev.content || '', reasonRaw: ev.reasoning || '', det: null, rbody: null, rsum: null, rcnt: null, live: false };
+  msgs.set(id, entry);
+  if (role === 'assistant' && entry.reasonRaw) {
+    ensureReason(id);
+    updateReason(entry);
+  }
   renderMessage(id);
+  scrollDown();
+}
+
+function addRound(ev) {
+  const div = document.createElement('div');
+  div.className = 'round';
+  div.textContent = `Runde ${ev.round || 1}`;
+  log.appendChild(div);
+  noteActivity();
+  scrollDown();
+}
+
+function ensureReason(id) {
+  const entry = msgs.get(id);
+  if (!entry || entry.det) return entry;
+  const det = document.createElement('details');
+  det.className = 'reason';
+  const sum = document.createElement('summary');
+  const label = document.createElement('span');
+  label.className = 'rlabel';
+  label.textContent = 'Denken';
+  const cnt = document.createElement('span');
+  cnt.className = 'rcnt';
+  sum.appendChild(label);
+  sum.appendChild(cnt);
+  const rbody = document.createElement('div');
+  rbody.className = 'rbody';
+  det.appendChild(sum);
+  det.appendChild(rbody);
+  entry.el.insertBefore(det, entry.body);
+  entry.det = det;
+  entry.rbody = rbody;
+  entry.rsum = label;
+  entry.rcnt = cnt;
+  det.open = false;
+  det.addEventListener('toggle', () => {
+    if (det.open) scrollReasonBottom(entry);
+  });
+  return entry;
+}
+
+function updateReason(entry) {
+  if (!entry.det) return;
+  const len = entry.reasonRaw.length;
+  entry.rbody.textContent = entry.reasonRaw;
+  entry.rsum.textContent = entry.live ? 'Denken…' : 'Denken';
+  entry.rcnt.textContent = len > 0 ? `${len.toLocaleString('de-DE')} Zeichen` : '';
+  entry.det.classList.toggle('live', !!entry.live);
+  if (entry.det.open) scrollReasonBottom(entry);
+}
+
+function scrollReasonBottom(entry) {
+  const b = entry.rbody;
+  if (!b) return;
+  if (b.scrollHeight - b.scrollTop - b.clientHeight < 80) b.scrollTop = b.scrollHeight;
+}
+
+function appendReasoning(ev) {
+  const entry = msgs.get(ev.id);
+  if (!entry) return;
+  ensureReason(ev.id);
+  entry.reasonRaw += ev.chunk || '';
+  entry.live = true;
+  curReason = entry;
+  updateReason(entry);
+  noteActivity();
   scrollDown();
 }
 
@@ -263,7 +345,12 @@ function appendChunk(ev) {
   const entry = msgs.get(ev.id);
   if (!entry) return;
   entry.raw += ev.chunk || '';
+  if (entry.det && entry.live) {
+    entry.live = false;
+    updateReason(entry);
+  }
   schedule(ev.id);
+  noteActivity();
   scrollDown();
 }
 
@@ -271,7 +358,15 @@ function setMessage(ev) {
   const entry = msgs.get(ev.id);
   if (!entry) return;
   entry.raw = ev.content || '';
+  if (typeof ev.reasoning === 'string') {
+    entry.reasonRaw = ev.reasoning;
+    if (entry.reasonRaw) {
+      ensureReason(ev.id);
+      updateReason(entry);
+    }
+  }
   renderMessage(ev.id);
+  noteActivity();
   scrollDown();
 }
 
@@ -294,9 +389,12 @@ function addToolCall(ev) {
   const short = document.createElement('span');
   short.className = 'tshort';
   short.textContent = shortArgs(ev.args);
+  const badge = document.createElement('span');
+  badge.className = 'trepeat';
   sum.appendChild(status);
   sum.appendChild(name);
   sum.appendChild(short);
+  sum.appendChild(badge);
 
   const body = document.createElement('div');
   body.className = 'tbody';
@@ -316,34 +414,46 @@ function addToolCall(ev) {
   resPre.className = 'result';
   resPre.hidden = true;
 
-  const actions = document.createElement('div');
-  actions.className = 'tactions';
-  actions.hidden = true;
-  const confirm = makeButton('Bestätigen', 'accent', () => {
-    confirm.disabled = true;
-    discard.disabled = true;
-    send({ action: 'confirmToolCall', id: ev.id });
-  });
-  const discard = makeButton('Verwerfen', '', () => {
-    confirm.disabled = true;
-    discard.disabled = true;
-    send({ action: 'discardToolCall', id: ev.id });
-  });
-  actions.appendChild(confirm);
-  actions.appendChild(discard);
-
   body.appendChild(argsLabel);
   body.appendChild(argsPre);
   body.appendChild(resLabel);
   body.appendChild(resPre);
-  body.appendChild(actions);
   det.appendChild(sum);
   det.appendChild(body);
   log.appendChild(det);
 
-  tools.set(ev.id, { det, status, resLabel, resPre, actions, confirm, discard });
-  setStatus(ev.id, 'running');
+  tools.set(ev.id, { det, status, name, short, badge, argsPre, resLabel, resPre, rawArgs: ev.args || '' });
+  if (ev.repeat > 1) setRepeat(ev.id, ev.repeat);
+  setStatus(ev.id, ev.live ? 'streaming' : 'running');
+  noteActivity();
   scrollDown();
+}
+
+function updateToolArgs(ev) {
+  const t = tools.get(ev.id);
+  if (!t) return;
+  if (ev.name) t.name.textContent = ev.name;
+  if (typeof ev.args === 'string') {
+    t.rawArgs = ev.args;
+    t.argsPre.textContent = ev.final ? prettyJson(ev.args) : ev.args;
+    t.argsPre.classList.toggle('partial', !ev.final);
+  } else {
+    t.rawArgs += ev.delta || '';
+    t.argsPre.textContent = t.rawArgs;
+    t.argsPre.classList.add('partial');
+  }
+  t.short.textContent = shortArgs(t.rawArgs);
+  if (ev.repeat > 1) setRepeat(ev.id, ev.repeat);
+  setStatus(ev.id, ev.final ? 'running' : 'streaming');
+  noteActivity();
+  scrollDown();
+}
+
+function setRepeat(id, n) {
+  const t = tools.get(id);
+  if (!t) return;
+  t.badge.textContent = `🔁 ${n}. Mal`;
+  t.det.classList.add('repeat');
 }
 
 function setStatus(id, state) {
@@ -351,12 +461,8 @@ function setStatus(id, state) {
   if (!t) return;
   t.status.textContent = STATUS[state] || state || '';
   t.det.classList.toggle('error', state === 'error');
-  t.actions.hidden = state !== 'pending';
-  if (state === 'pending') {
-    t.det.open = true;
-    t.confirm.disabled = false;
-    t.discard.disabled = false;
-  }
+  t.det.classList.toggle('streaming', state === 'streaming');
+  t.det.classList.toggle('cancelled', state === 'cancelled');
   scrollDown();
 }
 
@@ -372,6 +478,60 @@ function updateToolResult(ev) {
 
 let busyNow = false;
 let busyHideTimer = 0;
+let actTimer = 0;
+let actStart = 0;
+let lastAct = 0;
+let actRound = 0;
+let actTools = 0;
+let actTokens = 0;
+let actState = 'thinking';
+let actTool = '';
+let curReason = null;
+
+function fmtTokens(n) {
+  return n >= 1000 ? (n / 1000).toFixed(1).replace('.', ',') + 'k' : String(n);
+}
+
+function noteActivity() {
+  lastAct = Date.now();
+  if (busyNow) busyBox.classList.remove('stale');
+}
+
+function setActivity(ev) {
+  if (ev.round) actRound = ev.round;
+  if (ev.state) actState = ev.state;
+  if (ev.state === 'thinking') actTool = '';
+  else if (ev.tool) actTool = ev.tool;
+  if (typeof ev.tools === 'number') actTools = ev.tools;
+  if (typeof ev.tokens === 'number') actTokens = ev.tokens;
+  noteActivity();
+  paintActivity();
+}
+
+function thinkPreview() {
+  if (!curReason || !curReason.reasonRaw) return '';
+  const lines = curReason.reasonRaw.split(/\r?\n/).filter(s => s.trim().length);
+  if (!lines.length) return '';
+  const line = lines[lines.length - 1].trim();
+  return line.length > 140 ? '…' + line.slice(-140) : line;
+}
+
+function paintActivity() {
+  if (!busyNow) return;
+  busyLabel.textContent = STATE_LABEL[actState] || 'KI arbeitet';
+  const secs = Math.max(0, Math.round((Date.now() - actStart) / 1000));
+  const bits = [];
+  if (actRound > 1) bits.push('Runde ' + actRound);
+  if (actTools > 0) bits.push(actTools + (actTools === 1 ? ' Schritt' : ' Schritte'));
+  if (actTool) bits.push(actTool);
+  bits.push(secs + ' s');
+  if (actTokens > 0) bits.push(fmtTokens(actTokens) + ' Token');
+  busyStat.textContent = bits.join(' · ');
+  const idle = Math.round((Date.now() - lastAct) / 1000);
+  const stale = idle >= 15;
+  busyBox.classList.toggle('stale', stale);
+  thinkLine.textContent = stale ? `keine Daten seit ${idle} s – mit Esc abbrechen` : thinkPreview();
+}
 
 function setBusy(ev) {
   busyNow = !!ev.busy;
@@ -380,11 +540,33 @@ function setBusy(ev) {
     busyHideTimer = 0;
   }
   if (busyNow) {
+    actStart = Date.now();
+    lastAct = actStart;
+    actRound = 0;
+    actTools = 0;
+    actState = 'thinking';
+    actTool = '';
+    curReason = null;
+    if (!actTimer) actTimer = setInterval(paintActivity, 1000);
     busyBox.hidden = false;
     void busyBox.offsetWidth;
     busyBox.classList.add('on');
+    paintActivity();
     if (stick) scrollDown();
   } else {
+    if (actTimer) {
+      clearInterval(actTimer);
+      actTimer = 0;
+    }
+    busyBox.classList.remove('stale');
+    thinkLine.textContent = '';
+    for (const entry of msgs.values()) {
+      if (entry.live) {
+        entry.live = false;
+        updateReason(entry);
+      }
+    }
+    curReason = null;
     busyBox.classList.remove('on');
     busyHideTimer = setTimeout(() => {
       busyHideTimer = 0;
@@ -403,6 +585,13 @@ function clearChat() {
   tools.clear();
   dirty.clear();
   lastRender.clear();
+  curReason = null;
+  actRound = 0;
+  actTools = 0;
+  actState = 'thinking';
+  actTool = '';
+  busyBox.classList.remove('stale');
+  thinkLine.textContent = '';
   stick = true;
   jumpBtn.hidden = true;
   closeLightbox();
@@ -413,11 +602,15 @@ function handle(ev) {
   switch (ev.type) {
     case 'addMessage': addMessage(ev); break;
     case 'appendChunk': appendChunk(ev); break;
+    case 'appendReasoning': appendReasoning(ev); break;
     case 'setMessage': setMessage(ev); break;
     case 'removeMessage': removeMessage(ev); break;
+    case 'addRound': addRound(ev); break;
     case 'addToolCall': addToolCall(ev); break;
+    case 'updateToolArgs': updateToolArgs(ev); break;
     case 'updateToolResult': updateToolResult(ev); break;
     case 'updateToolStatus': setStatus(ev.id, ev.state); break;
+    case 'activity': setActivity(ev); break;
     case 'setBusy': setBusy(ev); break;
     case 'setTheme': setTheme(ev); break;
     case 'clearChat': clearChat(); break;

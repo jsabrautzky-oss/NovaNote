@@ -24,6 +24,9 @@
     <Color x:Key="ListHoverColor">#353535</Color>
     <Color x:Key="TabActiveColor">#202020</Color>
     <Color x:Key="TabHoverColor">#2B2B2B</Color>
+    <Color x:Key="MdTableRowEvenColor">#202020</Color>
+    <Color x:Key="MdTableRowOddColor">#2B2B2B</Color>
+    <Color x:Key="MdTableHeaderColor">#3A3A3A</Color>
 
     <SolidColorBrush x:Key="AppBgBrush" Color="{DynamicResource AppBgColor}"/>
     <SolidColorBrush x:Key="EditorBgBrush" Color="{DynamicResource EditorBgColor}"/>
@@ -48,6 +51,9 @@
     <SolidColorBrush x:Key="ListHoverBrush" Color="{DynamicResource ListHoverColor}"/>
     <SolidColorBrush x:Key="TabActiveBrush" Color="{DynamicResource TabActiveColor}"/>
     <SolidColorBrush x:Key="TabHoverBrush" Color="{DynamicResource TabHoverColor}"/>
+    <SolidColorBrush x:Key="MdTableRowEvenBrush" Color="{DynamicResource MdTableRowEvenColor}"/>
+    <SolidColorBrush x:Key="MdTableRowOddBrush" Color="{DynamicResource MdTableRowOddColor}"/>
+    <SolidColorBrush x:Key="MdTableHeaderBrush" Color="{DynamicResource MdTableHeaderColor}"/>
     <SolidColorBrush x:Key="SyntaxStringBrush" Color="#CE9178"/>
     <SolidColorBrush x:Key="SyntaxNumberBrush" Color="#B5CEA8"/>
     <SolidColorBrush x:Key="SyntaxKeywordBrush" Color="#569CD6"/>

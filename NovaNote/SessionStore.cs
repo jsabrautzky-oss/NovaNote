@@ -20,7 +20,12 @@ namespace NovaNote
         public string DismissedUpdateVersion { get; set; } = null;
         public bool AiPanelOpen { get; set; } = false;
         public double? AiPanelWidth { get; set; } = null;
-        public bool AiAutoApply { get; set; } = false;
+        public string AiReasoningEffort { get; set; } = null;
+#if DEBUG
+        public bool DebugLog { get; set; } = true;
+#else
+        public bool DebugLog { get; set; } = false;
+#endif
     }
 
     public class SessionTab
@@ -36,6 +41,7 @@ namespace NovaNote
         public int Caret { get; set; }
         public bool Dirty { get; set; }
         public int Language { get; set; }
+        public string Title { get; set; } = null;
     }
 
     public class SessionWindow

@@ -16,6 +16,12 @@
 - Nie mit „Ja“ speichern und nie mit „Abbrechen“ abbrechen – „Abbrechen“ und „Ja“ lassen das Programm offen bzw. schreiben Testdaten in echte Dateien.
 - Bei „Alle Tabs schließen“ gilt dasselbe: jeder aufgetauchte Speichern-Dialog wird mit „Nein“ beantwortet.
 
+## KI-Wissenswiki (hilfe.md)
+- `NovaNote/Assets/Help/hilfe.md` ist das eingebettete Nachschlagewerk, das die KI über das Werkzeug `get_help` liest (Loader `NovaNote/AiHelp.cs`, als `EmbeddedResource` in der `csproj`).
+- Nach **jeder** Änderung an Menüs, Tastenkürzeln, Editor-Funktionen (Folding, Umbruch, Nummern, Syntax-Check …), Einstellungen (`einstellungen.json`-Schlüssel) oder Dialogen `hilfe.md` mitpflegen, sonst antwortet die KI veraltet.
+- Der Platzhalter `%VERSION%` bleibt stehen; `AiHelp.Version()` setzt beim Laden die Assembly-Version ein.
+- Der `ui`-Modus des Harness prüft `get_help` (Inhaltsverzeichnis, Folding-Abschnitt, Tastenkürzel, nova-Fallback).
+
 ## Historie (CHANGELOG.md)
 - `CHANGELOG.md` ist die einzige Historie des Projekts: nach **jeder** abgeschlossenen Änderung sofort eine Bullet im Abschnitt `## Unreleased` eintragen – eine Bullet pro Änderung, ein Zeile, kurz.
 - Präfix je Bullet: `FEAT`, `FIX`, `CHORE` oder `TEST` plus Bereich, z. B. `FEAT ki: …`, `FIX save: …`, `TEST harness: …`.

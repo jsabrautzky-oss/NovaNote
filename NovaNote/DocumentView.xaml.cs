@@ -67,13 +67,32 @@ namespace NovaNote
         public bool WordWrap { get; private set; } = true;
         public DocLanguage Lang { get; private set; } = DocLanguage.None;
         public string StatusLanguage => DocLanguages.DisplayName(Lang);
-        public string TabTitle
+        public string CustomName { get; private set; } = null;
+        public string DisplayName
         {
             get
             {
-                string name = Path_ == null ? "Unbenannt" : System.IO.Path.GetFileName(Path_);
-                return name + (IsDirty ? "*" : "");
+                return Path_ != null ? System.IO.Path.GetFileName(Path_)
+                    : (string.IsNullOrWhiteSpace(CustomName) ? "Unbenannt" : CustomName);
             }
+        }
+        public string TabTitle => DisplayName + (IsDirty ? "*" : "");
+
+        public string SetTitle(string title)
+        {
+            if (Path_ != null)
+                return $"Dokument ist bereits als „{System.IO.Path.GetFileName(Path_)}“ gespeichert – Titel über dieses Werkzeug nicht änderbar.";
+            if (string.IsNullOrWhiteSpace(title)) return "Kein Titel angegeben.";
+            var sb = new StringBuilder();
+            char[] invalid = System.IO.Path.GetInvalidFileNameChars();
+            foreach (char c in title.Trim())
+                if (Array.IndexOf(invalid, c) < 0) sb.Append(c);
+            string clean = sb.ToString().Trim().TrimEnd('.');
+            if (clean.Length == 0) return "Ungültiger Titel.";
+            if (clean.Length > 80) clean = clean.Substring(0, 80);
+            CustomName = clean;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+            return $"Dokumenttitel auf „{clean}“ gesetzt.";
         }
 
         bool _loading;
@@ -203,13 +222,84 @@ namespace NovaNote
                     block.SetValue(TextElement.ForegroundProperty, text);
                 }
             }
+            TintMarkdownTableBackgrounds(doc, dark, text, accent);
+        }
+
+        void TintMarkdownTableBackgrounds(FlowDocument doc, bool dark, Brush text, Brush accent)
+        {
+            var even = FrozenBrush(AppBrush("MdTableRowEvenBrush"),
+                dark ? Color.FromRgb(0x20, 0x20, 0x20) : Colors.White);
+            var odd = FrozenBrush(AppBrush("MdTableRowOddBrush"),
+                dark ? Color.FromRgb(0x2B, 0x2B, 0x2B) : Color.FromRgb(0xF5, 0xF5, 0xF5));
+            var header = FrozenBrush(AppBrush("MdTableHeaderBrush"),
+                dark ? Color.FromRgb(0x3A, 0x3A, 0x3A) : Color.FromRgb(0xD3, 0xD3, 0xD3));
+            foreach (var block in doc.Blocks)
+                if (block is Table table)
+                    TintTableBackgrounds(table, dark, even, odd, header, text, accent);
+        }
+
+        void TintTableBackgrounds(Table table, bool dark, Brush even, Brush odd, Brush header, Brush text, Brush accent)
+        {
+            foreach (var group in table.RowGroups)
+            {
+                bool isHeader = group.Tag is string gt && gt.Contains("Header");
+                var groupBg = group.GetValue(TextElement.BackgroundProperty) as SolidColorBrush;
+                if (isHeader || (groupBg != null && Luminance(groupBg.Color) > 140))
+                    group.SetValue(TextElement.BackgroundProperty, header);
+
+                foreach (var row in group.Rows)
+                {
+                    if (row == null) continue;
+                    Brush bg;
+                    if (isHeader) bg = header;
+                    else if (row.Tag is string tag && tag.Contains("OddTableRow")) bg = odd;
+                    else if (row.Tag is string tag2 && tag2.Contains("EvenTableRow")) bg = even;
+                    else bg = dark ? Brushes.Transparent : null;
+                    row.SetValue(TextElement.BackgroundProperty, bg);
+                    foreach (var cell in row.Cells)
+                    {
+                        if (bg != null) cell.SetValue(TextElement.BackgroundProperty, bg);
+                        foreach (var inner in cell.Blocks)
+                        {
+                            if (inner is Table nested)
+                                TintTableBackgrounds(nested, dark, even, odd, header, text, accent);
+                            else
+                                TintBlockForeground(inner, dark, text, accent);
+                        }
+                    }
+                }
+            }
+        }
+
+        static double Luminance(Color c) => 0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B;
+
+        void TintBlockForeground(Block block, bool dark, Brush text, Brush accent)
+        {
+            if (block is Paragraph p)
+            {
+                TintMarkdownForeground(p, dark, text);
+                foreach (var inline in p.Inlines)
+                    TintMarkdownInline(inline, dark, text, accent);
+            }
+            else if (!(block is Table) && block is TextElement te)
+            {
+                te.SetValue(TextElement.ForegroundProperty, text);
+            }
+
+            if (block is Section sec)
+                foreach (var child in sec.Blocks)
+                    TintBlockForeground(child, dark, text, accent);
+            else if (block is List list)
+                foreach (var item in list.ListItems)
+                    foreach (var child in item.Blocks)
+                        TintBlockForeground(child, dark, text, accent);
         }
 
         void TintMarkdownForeground(DependencyObject element, bool dark, Brush text)
         {
             var current = element.GetValue(TextElement.ForegroundProperty) as SolidColorBrush;
             if (current == null || current.Color == Colors.Transparent) return;
-            double lum = 0.2126 * current.Color.R + 0.7152 * current.Color.G + 0.0722 * current.Color.B;
+            double lum = Luminance(current.Color);
             if (dark ? lum < 120 : lum > 150)
                 element.SetValue(TextElement.ForegroundProperty, text);
         }
@@ -1432,7 +1522,7 @@ namespace NovaNote
             if (!IsDirty) return true;
             if (!SessionStore.Prefs.AskSaveOnClose) return true;
             if (_promptAnswered) return true;
-            string name = Path_ == null ? "Unbenannt" : System.IO.Path.GetFileName(Path_);
+            string name = DisplayName;
             var owner = Window.GetWindow(this);
             var r = owner != null
                 ? MessageBox.Show(owner,
@@ -1470,7 +1560,7 @@ namespace NovaNote
                 FilterIndex = DocLanguages.FilterIndex(Lang),
                 DefaultExt = ext,
                 AddExtension = true,
-                FileName = Path_ == null ? $"Unbenannt.{ext}" : System.IO.Path.GetFileName(Path_)
+                FileName = Path_ != null ? System.IO.Path.GetFileName(Path_) : $"{DisplayName}.{ext}"
             };
             if (Path_ != null) dlg.InitialDirectory = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Path_));
             if (dlg.ShowDialog(Window.GetWindow(this)) != true) return false;
@@ -1694,12 +1784,13 @@ namespace NovaNote
 
         public void RestoreSession(string path, string text, NovaNoteEncoding enc, LineEnding eol,
                                    int zoom, bool wrap, double scrollX, double scrollY, int caret, bool dirty,
-                                   DocLanguage language)
+                                   DocLanguage language, string title = null)
         {
             SetWordWrap(wrap);
             SetText(text ?? "");
             ClearUndoStack();
             Path_ = path;
+            CustomName = string.IsNullOrWhiteSpace(title) ? null : title;
             Enc = enc;
             Eol = eol;
             Lang = language;

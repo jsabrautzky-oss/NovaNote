@@ -2,8 +2,17 @@
 
 **Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-Aktuelle Version: **0.7.1**  
-GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.7.1
+Aktuelle Version: **0.8.0**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.8.0
+
+## Neu in 0.8.0
+- **Die KI schlägt das Nachschlagewerk nach**: neues Werkzeug `get_help` mit eingebettetem `hilfe.md` – Bedienfragen zu Menüs, Tastenkürzeln, Folding und Einstellungen beantwortet die KI aus dem Handbuch statt aus dem Kopf
+- **Denken in Echtzeit**: der SSE-Strom wird nicht mehr bis zum Antwortende gepuffert (`ResponseHeadersRead`) – Denk-Blöcke (🧠 „Denken“), Antwort und Tool-Argumente wachsen tokenweise mit, während das Modell denkt (z. B. gegen llama-server)
+- **Denk-Block im Chat**: abgesetzt über der Antwort, standardmäßig zugeklappt mit Zeichenanzahl im Summary; ein Klick öffnet ihn, das Denken läuft dort live weiter (wachsender Text, blinkender Cursor, Auto-Scroll)
+- **Tool-Karten live**: Namen erscheinen sofort im Antwortstrom, die Argumente wachsen live mit („✍️ schreibt…“), Runden-Marken („Runde N“) und 🔁-Badge bei Wiederholungen
+- **Live-Statuszeile „KI denkt“**: Zustand, Runde, Schrittanzahl, Laufzeit, Tokenstand und der letzte Denksatz; nach 15 s Datenstille warnt sie „keine Daten seit … s – mit Esc abbrechen“
+- **Robustere KI-Läufe**: ein Lauf ist an sein Start-Dokument gebunden (Tab-Wechsel biegt das Schreibziel nicht um), Anti-Loop korrigiert statt abzubrechen, jede `tool_call` bekommt ein Ergebnis, und eine Runde mit nur Denkinhalt löst bis zu zwei Nachfragen aus
+- **Dunkles Theme für Markdown-Tabellen**: Zebra-Zellen und Kopfzeile sind jetzt dunkel statt hell mit heller Schrift
 
 ## Neu in 0.7.1
 - **Update in-app mit Fortschritt**: installierte Versionen updaten über Velopack (GitHub-`RELEASES`-Asset); das Dialog „NovaNote – Update“ zeigt Download und Installation mit Balken und Prozent — vorher gab es nur einen Wait-Cursor. Das Delta-Paket ab 0.7.0 lädt nur ~0,3 MB statt des vollen Pakets (~91 MB)

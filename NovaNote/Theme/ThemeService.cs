@@ -64,7 +64,8 @@ namespace NovaNote
             if (app == null) return;
 
             var dicts = app.Resources.MergedDictionaries;
-            var themeUri = $"pack://application:,,,/Theme/{(IsDark ? "Dark" : "Light")}.xaml";
+            string asm = typeof(ThemeService).Assembly.GetName().Name;
+            var themeUri = $"pack://application:,,,/{asm};component/Theme/{(IsDark ? "Dark" : "Light")}.xaml";
             var replacement = new ResourceDictionary { Source = new Uri(themeUri, UriKind.Absolute) };
             for (int i = 0; i < dicts.Count; i++)
             {
