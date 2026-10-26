@@ -2,6 +2,15 @@
 <!-- Konvention: eine Bullet = eine Änderung, ein Zeile, kurz. Präfix FEAT | FIX | CHORE | TEST (+ Bereich, z. B. ki/save/ui/harness).
      Die Zeile "Kurz: …" unter jeder Überschrift ist die einzeilige Summary; release.ps1 baut daraus die GitHub-Release-Notes. -->
 
+## 0.8.2
+Kurz: Läuft ein KI-Lauf, zeigt Windows unter dem NovaNote-Icon einen animierten Fortschrittsbalken in der Taskleiste – nur wenn das Icon angeheftet ist.
+
+- FEAT ki: Taskbar-Fortschrittsbalken (`TaskbarItemInfo`) – `Indeterminate` (Balken wandert) solange ein KI-Lauf läuft, `Error` (rot) bei fehlgeschlagenem Lauf und `Paused` (gelb) nach Esc je 6 s, sonst `None`; Windows zeigt ihn nur, wenn das NovaNote-Icon in der Taskleiste angeheftet ist
+- TEST harness: UI-Modus prüft den Taskbar-Balken – `SetAiBusy(true/false)` setzt `ProgressState` auf `Indeterminate` bzw. `None`
+
+### Paket
+- Velopack-Installer `NovaNote-win-Setup.exe`, Portable-Zip `NovaNote-win-Portable.zip`, Full-Paket `NovaNote-0.8.2-full.nupkg`, Delta von 0.8.1 (`NovaNote-0.8.2-delta.nupkg`)
+
 ## 0.8.1
 Kurz: Im KI-Einstellungen kann der Nutzer wieder aus dem Context-/Sampler-Fields aus, und der Kontext-Kürzling folgt den Token-Budget statt einem Message-Limit.
 

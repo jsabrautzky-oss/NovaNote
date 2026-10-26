@@ -9,7 +9,10 @@
         Background="{DynamicResource AppBgBrush}" Foreground="{DynamicResource TextBrush}"
         AllowDrop="True"
         PreviewKeyDown="Window_PreviewKeyDown"
-        PreviewDragOver="Window_PreviewDragOver" PreviewDrop="Window_PreviewDrop">
+        PreviewDragOver="Window_PreviewDragOver"         PreviewDrop="Window_PreviewDrop">
+    <Window.TaskbarItemInfo>
+        <TaskbarItemInfo ProgressState="None" ProgressValue="0"/>
+    </Window.TaskbarItemInfo>
     <Window.Resources>
         <DataTemplate x:Key="FavoriteItemTemplate">
             <StackPanel Orientation="Horizontal" Margin="0,3">

@@ -15,6 +15,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using System.Windows.Shell;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 
@@ -45,6 +46,7 @@ namespace NovaNote
         GoToDialog _gotoDlg;
         DispatcherTimer _autosave;
         DispatcherTimer _status;
+        DispatcherTimer _taskbarEnd;
         readonly ContextMenu _langMenu = new ContextMenu();
         readonly List<MenuItem> _langMenuItems = new List<MenuItem>();
         MenuItem _langAutoMenuItem;
@@ -1950,8 +1952,35 @@ namespace NovaNote
             AiCancelButton.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
             AiScanItem.IsEnabled = !busy;
             if (busy) AiStatus.Text = "KI: denkt…";
+            if (busy) { _taskbarEnd?.Stop(); _taskbarEnd = null; }
+            if (busy) TaskbarWrite(TaskbarItemProgressState.Indeterminate);
+            else if (_taskbarEnd == null) TaskbarWrite(TaskbarItemProgressState.None);
             UpdateAiAttachUi();
             PostChat(new { type = "setBusy", busy });
+        }
+
+        void TaskbarWrite(TaskbarItemProgressState state)
+        {
+            try
+            {
+                var tb = TaskbarItemInfo;
+                if (tb == null) return;
+                tb.ProgressState = state;
+            }
+            catch { }
+        }
+
+        void TaskbarEndState(TaskbarItemProgressState state)
+        {
+            TaskbarWrite(state);
+            _taskbarEnd?.Stop();
+            _taskbarEnd = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            _taskbarEnd.Tick += (s, e) =>
+            {
+                TaskbarWrite(TaskbarItemProgressState.None);
+                _taskbarEnd.Stop();
+            };
+            _taskbarEnd.Start();
         }
 
         void PostActivity(string state, string tool = null)
@@ -2268,6 +2297,7 @@ namespace NovaNote
                             : "";
                         DebugLog.Log("KI", $"Fehler (Runde {round + 1}): {reply.Error}");
                         AppendAi("Fehler: " + reply.Error + hint);
+                        TaskbarEndState(TaskbarItemProgressState.Error);
                         break;
                     }
 
@@ -2373,6 +2403,7 @@ namespace NovaNote
                     _chatTranscript.Remove(_chatStreamEntry);
                 DebugLog.Log("KI", "Lauf abgebrochen (Nutzer/Escape).");
                 AppendAi("Abgebrochen.");
+                TaskbarEndState(TaskbarItemProgressState.Paused);
             }
             finally
             {

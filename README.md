@@ -2,8 +2,11 @@
 
 **Kurze Beschreibung:** Leichter Windows-Texteditor mit AvalonEdit, Themes, Mehrfach-Tabs, Syntax-Check und Code-Folding — **optional mit lokaler KI-Anbindung**. Die KI läuft gegen einen eigenen Server (LM Studio, Ollama oder `llama-server`), es werden keine Daten in die Cloud geschickt und ohne Server bleibt NovaNote ein rein lokaler Editor.
 
-Aktuelle Version: **0.8.1**  
-GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.8.1
+Aktuelle Version: **0.8.2**  
+GitHub Release: https://github.com/jsabrautzky-oss/NovaNote/releases/tag/v0.8.2
+
+## Neu in 0.8.2
+- **Taskbar-Fortschrittsbalken**: Läuft ein KI-Lauf, wandert in der Windows-Taskleiste unter dem NovaNote-Icon ein Balken (bei Fehler rot, nach Esc gelb, je 6 s) und ist sonst aus. Windows zeigt ihn nur, wenn das NovaNote-Icon in der Taskleiste angeheftet ist.
 
 ## Neu in 0.8.1
 - **KI-Einstellungen: Fields can be left**: im Context- und Sampler-Fields der Modellauswahl nicht mehr stuck – lost focus commits ohne Focus()-regrab, so the field can be left; Enter-Commit stays in the field
